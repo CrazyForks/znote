@@ -70,9 +70,9 @@ const isPinned = computed(() => props.note.is_pinned === 1);
       </h3>
     </div>
 
-    <!-- 摘要 -->
-    <p v-if="summary" class="mt-1 line-clamp-2 text-xs text-slate-500">
-      {{ summary }}
+    <!-- 摘要：始终占一行高度，保证卡片高度一致 -->
+    <p class="mt-1 line-clamp-1 text-xs text-slate-500">
+      {{ summary || "\u00A0" }}
     </p>
 
     <!-- 时间 -->
