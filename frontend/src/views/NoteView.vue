@@ -468,7 +468,7 @@ const handleSaveTitle = async () => {
 /* 拖拽把手：两栏之间各放一个，4px 宽
    视觉完全透明，仅靠 cursor: col-resize 提示可拖拽 */
 .resize-handle {
-  width: 0px;
+  width: 2px;
   cursor: col-resize;
   flex-shrink: 0;
   background: transparent;
