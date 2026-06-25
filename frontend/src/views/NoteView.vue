@@ -622,6 +622,7 @@ const handleSaveTitle = async () => {
           v-else
           :tree="currentCategoryTree"
           :active-id="noteStore.activeCategoryId"
+          :is-mobile="isMobile"
           @select="handleSelectCategory"
           @request-dialog="(pid: number, pname: string) => openCreateCategoryDialog(pid, pname)"
           @contextmenu="handleCategoryContextMenu"

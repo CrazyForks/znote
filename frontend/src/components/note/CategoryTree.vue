@@ -33,6 +33,8 @@ const props = defineProps<{
     /** 当前笔记本的 children（已经过滤过） */
     tree: NotebookNode[];
     activeId: number | null;
+    /** 是否为移动端视口 */
+    isMobile: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -175,6 +177,7 @@ const onDragEnd = async () => {
         v-model="localTree"
         :animation="150"
         :disabled="noteStore.loading.save"
+        handle=".drag-handle"
         @end="onDragEnd"
       >
         <CategoryTreeNode
@@ -183,6 +186,7 @@ const onDragEnd = async () => {
           :node="node"
           :active-id="activeId"
           :level="0"
+          :is-mobile="props.isMobile"
           @select="(id: number) => emit('select', id)"
           @add-child="(id: number, title: string) => emit('addChild', id, title)"
           @request-dialog="(pid: number, pname: string) => emit('requestDialog', pid, pname)"

@@ -27,6 +27,8 @@ const props = defineProps<{
     activeId: number | null;
     /** 节点在树中的深度（用于样式缩进） */
     level: number;
+    /** 是否为移动端视口 */
+    isMobile: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -130,6 +132,18 @@ const onChildDragEnd = async () => {
       @mouseenter="hovered = true"
       @mouseleave="hovered = false"
     >
+      <!-- 拖拽把手：PC 端 hover 显示，移动端始终显示 -->
+      <div
+        class="drag-handle shrink-0 cursor-grab transition"
+        :class="
+          props.isMobile
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100'
+        "
+      >
+        <ZIcon name="ri:draggable" :size="14" color="#94a3b8" />
+      </div>
+
       <!-- 展开/折叠图标（叶子节点占位保持对齐） -->
       <button
         class="flex h-4 w-4 shrink-0 items-center justify-center rounded transition hover:bg-slate-600/60"
@@ -171,6 +185,7 @@ const onChildDragEnd = async () => {
       v-model="localChildren"
       :animation="150"
       :disabled="noteStore.loading.save"
+      handle=".drag-handle"
       @end="onChildDragEnd"
     >
       <CategoryTreeNode
@@ -179,6 +194,7 @@ const onChildDragEnd = async () => {
         :node="child"
         :active-id="activeId"
         :level="level + 1"
+        :is-mobile="props.isMobile"
         @select="(id: number) => emit('select', id)"
         @request-dialog="(pid: number, pname: string) => emit('requestDialog', pid, pname)"
         @contextmenu="(n: NotebookNode, e: MouseEvent) => emit('contextmenu', n, e)"
