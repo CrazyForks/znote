@@ -49,6 +49,9 @@ onMounted(() => {
         mode: "ir",
         theme: "classic",
         lang: "zh_CN",
+        icon: "ant",
+        // 所有外部资源（图标/语言包/Lute引擎/高亮/主题CSS）从本地加载，不依赖 CDN
+        cdn: "/static/vditor",
         placeholder: props.placeholder || "开始编写...",
         value: props.modelValue,
         toolbarConfig: { pin: true },
@@ -59,13 +62,6 @@ onMounted(() => {
         preview: {
             theme: {
                 current: "ant-design",
-                list: {
-                    "ant-design": "Ant Design",
-                    light: "Light",
-                    dark: "Dark",
-                    wechat: "WeChat",
-                },
-                path: "/static/vditor-themes",
             },
             hljs: {
                 style: "github",
