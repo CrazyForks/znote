@@ -39,6 +39,7 @@ export const listNoteVersions = async (c: Context) => {
         .select({
             id: schema.noteVersions.id,
             version_no: schema.noteVersions.version_no,
+            title: schema.noteVersions.title,
             created_at: schema.noteVersions.created_at,
         })
         .from(schema.noteVersions)

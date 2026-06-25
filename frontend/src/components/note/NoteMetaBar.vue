@@ -19,11 +19,14 @@ const props = defineProps<{
     categoryName: string;
     /** 保存按钮 loading 态 */
     saving?: boolean;
+    /** 是否处于历史版本查看模式（控制【回到当前】按钮显隐） */
+    viewingVersion?: boolean;
 }>();
 
 const emit = defineEmits<{
     (e: "save"): void;
     (e: "history"): void;
+    (e: "back-to-current"): void;
 }>();
 
 /** 格式化时间：年/月/日 时:分:秒 */
@@ -68,6 +71,17 @@ const updatedText = computed(() => formatTime(props.note.updated_at));
 
     <!-- 右侧：历史按钮 + 保存按钮 -->
     <div class="flex shrink-0 items-center gap-2">
+      <!-- 回到当前按钮（仅查看历史模式时展示） -->
+      <button
+        v-if="viewingVersion"
+        class="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
+        type="button"
+        @click="emit('back-to-current')"
+      >
+        <ZIcon name="ri:arrow-go-back-line" :size="14" color="currentColor" />
+        <span>{{ t("note.version.back_to_current") }}</span>
+      </button>
+
       <!-- 历史版本按钮（次级样式，点击打开历史抽屉） -->
       <button
         class="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-blue-300 hover:text-blue-600"

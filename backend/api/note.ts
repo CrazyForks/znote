@@ -170,6 +170,15 @@ export const updateNote = async (c: Context) => {
         }
     }
 
+    // 如果传了 title，校验非空（trim 后不能为空字符串）
+    if (title !== undefined && title.trim().length === 0) {
+        return c.json({
+            code: -1000,
+            msg: "note.update.title_required",
+            data: null,
+        });
+    }
+
     // 构建更新字段（部分更新）
     const updates: Record<string, any> = { updated_at: new Date() };
     if (title !== undefined) updates.title = title.trim();
@@ -179,8 +188,11 @@ export const updateNote = async (c: Context) => {
     if (sort_order !== undefined) updates.sort_order = sort_order;
 
     // 仅当 title 或 content 实际变化时才生成历史版本
+    // content 的 trim 仅用于判定是否记版本，实际存储保留原值（含空白）
     const titleChanged = title !== undefined && title.trim() !== oldNote.title;
-    const contentChanged = content !== undefined && content !== oldNote.content;
+    const contentChanged = content !== undefined
+        && content.trim() !== oldNote.content
+        && content.trim() !== "";
     const needVersion = titleChanged || contentChanged;
 
     // 事务：存历史快照（可选）→ 更新笔记，保证原子性

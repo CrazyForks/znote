@@ -24,6 +24,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: "update:show", val: boolean): void;
+    (e: "view", versionId: number): void;
 }>();
 
 /** 加载态：loading | empty | done */
@@ -118,20 +119,32 @@ watch(
               <span class="text-xs text-slate-400">{{ formatTime(item.created_at) }}</span>
             </div>
 
-            <!-- 底部：预留操作按钮（仅占位，无任何点击逻辑） -->
-            <div class="mt-2 flex justify-end gap-2">
-              <button
-                class="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
-                type="button"
+            <!-- 旧标题 + 操作按钮（同行：左标题右按钮） -->
+            <div class="mt-1 flex items-center justify-between gap-2">
+              <!-- 标题（超出省略号，hover 显示完整标题） -->
+              <span
+                class="min-w-0 truncate text-sm text-slate-600"
+                :title="item.title"
               >
-                {{ t("note.version.view") }}
-              </button>
-              <button
-                class="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
-                type="button"
-              >
-                {{ t("note.version.restore") }}
-              </button>
+                {{ item.title }}
+              </span>
+
+              <!-- 预留操作按钮（仅占位，无任何点击逻辑） -->
+              <div class="flex shrink-0 gap-2">
+                <button
+                  class="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
+                  type="button"
+                  @click="emit('view', item.id)"
+                >
+                  {{ t("note.version.view") }}
+                </button>
+                <button
+                  class="rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
+                  type="button"
+                >
+                  {{ t("note.version.restore") }}
+                </button>
+              </div>
             </div>
           </div>
         </template>

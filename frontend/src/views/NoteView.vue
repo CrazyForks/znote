@@ -28,7 +28,8 @@ import VersionHistoryDialog from "@/components/note/dialogs/VersionHistoryDialog
 import CategoryContextMenu from "@/components/note/CategoryContextMenu.vue";
 import { useNoteStore } from "@/stores/note";
 import { useUserStore } from "@/stores/user";
-import { NModal, NInput } from "naive-ui";
+import { fetchNoteVersion } from "@/api/note";
+import { NModal, NInput, NAlert } from "naive-ui";
 import type { NotebookNode } from "@/types/note";
 import type { CategoryContextAction } from "@/components/note/CategoryContextMenu.vue";
 
@@ -92,6 +93,54 @@ const moveCurrentCategoryId = ref<number | null>(null);
 
 /** 历史版本抽屉显隐 */
 const showVersionHistory = ref(false);
+
+// ==================== 历史版本查看模式 ====================
+
+/** 是否处于历史版本查看模式（控制【回到当前】按钮 + 警告条显隐） */
+const viewingVersion = ref(false);
+/** 当前查看的版本号（警告条展示用） */
+const viewingVersionNo = ref<number | null>(null);
+/** 最初的实际内容备份（仅首次进入查看模式时存，用于回到当前） */
+const versionBackup = ref<{ title: string; content: string } | null>(null);
+
+/**
+ * 查看某个历史版本
+ * 拉取详情 → 备份当前实际内容（仅首次）→ 替换编辑器内容 → 关闭抽屉
+ */
+const handleViewVersion = async (versionId: number) => {
+    const res = await fetchNoteVersion(versionId);
+    if (!res) return;
+
+    // 仅首次进入查看模式时备份当前实际内容，后续切换版本不动备份
+    if (versionBackup.value === null) {
+        versionBackup.value = {
+            title: draftTitle.value,
+            content: draftContent.value,
+        };
+    }
+
+    // 替换编辑器内容为历史版本
+    draftTitle.value = res.title;
+    draftContent.value = res.content;
+    viewingVersionNo.value = res.version_no;
+    viewingVersion.value = true;
+
+    // 关闭抽屉，回到编辑器预览
+    showVersionHistory.value = false;
+};
+
+/**
+ * 回到当前：从备份还原编辑器内容，退出查看模式
+ */
+const handleBackToCurrent = () => {
+    if (versionBackup.value) {
+        draftTitle.value = versionBackup.value.title;
+        draftContent.value = versionBackup.value.content;
+    }
+    versionBackup.value = null;
+    viewingVersion.value = false;
+    viewingVersionNo.value = null;
+};
 
 /**
  * 递归收集节点的所有子孙 id（用于构建排除列表）
@@ -420,6 +469,13 @@ const handleSaveNote = async () => {
         });
         // 轻量提示
         message.success(t("note.editor.saved"));
+
+        // 保存成功后自动退出历史查看模式（保存即回滚生效，内容已成新当前态）
+        if (viewingVersion.value) {
+            versionBackup.value = null;
+            viewingVersion.value = false;
+            viewingVersionNo.value = null;
+        }
     } catch {
         message.error(t("note.editor.save_failed"));
     } finally {
@@ -562,14 +618,27 @@ const handleSaveTitle = async () => {
               :note="noteStore.activeNote"
               :category-name="activeCategoryName"
               :saving="isSaving"
+              :viewing-version="viewingVersion"
               @save="handleSaveNote"
               @history="showVersionHistory = true"
+              @back-to-current="handleBackToCurrent"
             />
           </div>
+
+          <!-- 历史版本查看警告条 -->
+          <NAlert
+            v-if="viewingVersion"
+            type="warning"
+            show-icon
+            class="mt-2"
+            :show-arrow="false"
+          >
+            {{ t("note.version.viewing_warning", { version: viewingVersionNo }) }}
+          </NAlert>
         </div>
 
         <!-- 编辑器主体 -->
-        <div class="flex-1 overflow-hidden bg-white px-6 pb-6 pt-0">
+        <div class="flex-1 overflow-hidden bg-white px-8 pb-6 pt-0">
           <NoteEditor
             :model-value="draftContent"
             height="100%"
@@ -666,6 +735,7 @@ const handleSaveTitle = async () => {
     <VersionHistoryDialog
       v-model:show="showVersionHistory"
       :note-id="noteStore.activeNoteId"
+      @view="handleViewVersion"
     />
   </div>
 </template>

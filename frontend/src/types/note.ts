@@ -87,6 +87,7 @@ export interface DeleteNotebookResult {
 export interface NoteVersionItem {
     id: number;
     version_no: number;
+    title: string;
     created_at: number | string;
 }
 
