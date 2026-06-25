@@ -9,7 +9,7 @@
  *  - 展开/折叠：子节点显示隐藏
  *  - 子节点之间支持同级拖拽排序
  */
-import { ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useMessage } from "naive-ui";
 import { VueDraggable } from "vue-draggable-plus";
@@ -35,19 +35,32 @@ const emit = defineEmits<{
     (e: "contextmenu", node: NotebookNode, event: MouseEvent): void;
 }>();
 
-/** 展开/折叠状态 */
-const expanded = ref(true);
+/**
+ * 注入展开上下文（由 CategoryTree 通过 provide 提供）
+ * - expandedIds: 当前展开的节点 ID 集合
+ * - toggleExpand: 切换展开状态（顶级互斥，子级自由）
+ */
+const { expandedIds, toggleExpand: doToggleExpand } = inject<{
+    expandedIds: { value: Set<number> };
+    toggleExpand: (nodeId: number, level: number) => void;
+}>("categoryExpand", {
+    expandedIds: { value: new Set<number>() },
+    toggleExpand: () => {},
+});
+
+/** 当前节点是否展开（从共享集合中读取） */
+const isExpanded = computed(() => expandedIds.value.has(props.node.id));
 /** 鼠标是否悬停（用于显示"+"按钮） */
 const hovered = ref(false);
 
 /** 是否有子节点 */
 const hasChildren = () => props.node.children.length > 0;
 
-/** 切换展开 */
+/** 切换展开（委托给 CategoryTree 的 toggleExpand，处理顶级互斥逻辑） */
 const toggleExpand = (e: Event) => {
     e.stopPropagation();
     if (hasChildren()) {
-        expanded.value = !expanded.value;
+        doToggleExpand(props.node.id, props.level);
     }
 };
 
@@ -63,7 +76,10 @@ const handleSelect = () => {
  */
 const handleAddChild = (e: Event) => {
     e.stopPropagation();
-    expanded.value = true;
+    // 新建子分类时自动展开当前节点
+    if (!isExpanded.value) {
+        doToggleExpand(props.node.id, props.level);
+    }
     emit("requestDialog", props.node.id, props.node.title);
 };
 
@@ -121,7 +137,7 @@ const onChildDragEnd = async () => {
         @click="toggleExpand"
       >
         <ZIcon
-          :name="expanded ? 'ri:arrow-down-s-line' : 'ri:arrow-right-s-line'"
+          :name="isExpanded ? 'ri:arrow-down-s-line' : 'ri:arrow-right-s-line'"
           :size="14"
           color="currentColor"
         />
@@ -151,7 +167,7 @@ const onChildDragEnd = async () => {
 
     <!-- 递归渲染子节点，同层兄弟支持拖拽排序（无 group，天然隔离不跨层） -->
     <VueDraggable
-      v-if="hasChildren() && expanded"
+      v-if="hasChildren() && isExpanded"
       v-model="localChildren"
       :animation="150"
       :disabled="noteStore.loading.save"

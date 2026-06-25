@@ -16,7 +16,7 @@
  *   - select: 选中分类
  *   - addChild: 新建子分类
  */
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, provide, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useMessage } from "naive-ui";
 import { VueDraggable } from "vue-draggable-plus";
@@ -58,6 +58,93 @@ watch(
     },
     { immediate: true },
 );
+
+// ==================== 展开/折叠状态管理 ====================
+
+/**
+ * 展开状态集合（所有层级的展开节点 ID 集合）
+ * - 顶级分类：同一时刻仅允许展开一个（互斥），展开新节点时自动关闭上一个
+ * - 子级分类（二级、三级等）：自由展开/折叠，不受互斥限制
+ * - 状态持久化到 sessionStorage，刷新页面或切换笔记本后可恢复
+ */
+const expandedIds = ref<Set<number>>(new Set());
+
+/** 顶级节点 ID 集合（用于互斥判断） */
+const topLevelIds = computed(() => new Set(props.tree.map((n) => n.id)));
+
+/** sessionStorage key，按笔记本 ID 隔离，不同笔记本各自维护展开状态 */
+const getStorageKey = () => `note:expandedCategories:${noteStore.activeNotebookId}`;
+
+/**
+ * 从 sessionStorage 恢复展开状态
+ * 加载时过滤掉已不存在的陈旧 ID（分类可能已被删除）
+ */
+const loadFromSession = () => {
+    const raw = sessionStorage.getItem(getStorageKey());
+    if (!raw) {
+        expandedIds.value = new Set();
+        return;
+    }
+    try {
+        // 收集当前树中所有有效 ID，用于过滤陈旧数据
+        const allValidIds = new Set<number>();
+        const collect = (nodes: NotebookNode[]) => {
+            for (const n of nodes) {
+                allValidIds.add(n.id);
+                collect(n.children);
+            }
+        };
+        collect(props.tree);
+        expandedIds.value = new Set(
+            (JSON.parse(raw) as number[]).filter((id) => allValidIds.has(id)),
+        );
+    } catch {
+        expandedIds.value = new Set();
+    }
+};
+
+/** 将当前展开状态写入 sessionStorage */
+const saveToSession = () => {
+    sessionStorage.setItem(getStorageKey(), JSON.stringify([...expandedIds.value]));
+};
+
+/**
+ * 切换节点展开/折叠状态
+ * - 顶级分类（level === 0）：互斥模式，展开新节点时自动关闭其他已展开的顶级节点
+ * - 子级分类（level > 0）：自由切换，不影响其他节点
+ * @param nodeId 节点 ID
+ * @param level 节点层级（0 = 顶级）
+ */
+const toggleExpand = (nodeId: number, level: number) => {
+    const newSet = new Set(expandedIds.value);
+    if (level === 0) {
+        // 顶级分类互斥逻辑
+        if (newSet.has(nodeId)) {
+            newSet.delete(nodeId); // 已展开 → 折叠
+        } else {
+            // 展开前，移除其他顶级节点的展开状态（自动关闭上一个）
+            for (const id of newSet) {
+                if (topLevelIds.value.has(id)) newSet.delete(id);
+            }
+            newSet.add(nodeId);
+        }
+    } else {
+        // 子级分类自由切换
+        if (newSet.has(nodeId)) newSet.delete(nodeId);
+        else newSet.add(nodeId);
+    }
+    expandedIds.value = newSet;
+    saveToSession();
+};
+
+/** provide 展开上下文，供所有递归子节点 inject 使用 */
+provide("categoryExpand", { expandedIds, toggleExpand });
+
+// 组件挂载时 tree 数据已就绪（父组件 v-if loading 控制），从 session 恢复展开状态
+onMounted(loadFromSession);
+
+// 笔记本切换时重新恢复展开状态（tree 同步更新，无需 nextTick）
+watch(() => noteStore.activeNotebookId, loadFromSession);
 
 /**
  * 拖拽结束回调
