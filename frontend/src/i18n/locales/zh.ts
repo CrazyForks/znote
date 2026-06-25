@@ -188,4 +188,8 @@ export default {
     "note.context.trash.success": "已移入回收站",
     "note.context.pin.success": "已置顶",
     "note.context.unpin.success": "已取消置顶",
+    "import.success": "导入成功",
+    "import.notebook_required": "请选择目标笔记本",
+    "import.file_required": "请上传 ZIP 文件",
+    "import.notebook_not_found": "笔记本不存在或无权访问",
 };

@@ -20,6 +20,7 @@ import {
 } from "@/api/user";
 import { listNotebooks, getTopLevelNotebooks, createNotebook, updateNotebook, sortNotebooks } from "@/api/notebook";
 import { listNotes, createNote, updateNote, deleteNote, sortNotes } from "@/api/note";
+import { importZip } from "@/api/import";
 import { searchNotes } from "@/api/search";
 import { verifyApiToken } from "@/middleware/auth";
 import type { AppVariables } from "@/types";
@@ -84,6 +85,8 @@ userRouter.post("/notebook/note/create", createNote);
 userRouter.post("/notebook/note/update", updateNote);
 userRouter.post("/notebook/note/delete", deleteNote);
 userRouter.post("/notebook/note/sort", sortNotes);
+
+userRouter.post("/import", importZip);
 
 adminRouter.get("/app_info", getAppInfo);
 adminRouter.get("/list_users", listUsers);

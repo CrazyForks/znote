@@ -188,4 +188,8 @@ export default {
     "note.context.trash.success": "Moved to trash",
     "note.context.pin.success": "Pinned",
     "note.context.unpin.success": "Unpinned",
+    "import.success": "Import successful",
+    "import.notebook_required": "Please select a target notebook",
+    "import.file_required": "Please upload a ZIP file",
+    "import.notebook_not_found": "Notebook not found or access denied",
 };
