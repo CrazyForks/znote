@@ -24,6 +24,8 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: "update:modelValue", value: string): void;
     (e: "ready"): void;
+    /** 内容渲染完成（setValue 执行完毕后触发，用于隐藏骨架屏） */
+    (e: "rendered"): void;
 }>();
 
 /** 标记是否由内部触发的内容更新，避免循环同步 */
@@ -63,7 +65,7 @@ onMounted(() => {
                     dark: "Dark",
                     wechat: "WeChat",
                 },
-                path: "https://unpkg.com/vditor@3.11.2/dist/css/content-theme",
+                path: "/static/vditor-themes",
             },
             hljs: {
                 style: "github",
@@ -72,7 +74,7 @@ onMounted(() => {
             markdown: {
                 // autoSpace: true,
                 fixTermTypo: true,
-                toc: true,
+                toc: false, // 关闭目录生成，减少每次渲染开销
             },
         },
         input(value) {
@@ -102,6 +104,8 @@ watch(
                 isInternalUpdate = false;
             });
         }
+        // 无论是否调用 setValue，都通知父组件渲染完成（用于隐藏骨架屏）
+        emit("rendered");
     },
 );
 

@@ -174,22 +174,29 @@ export const useNoteStore = defineStore("note", {
         },
 
         /**
-         * 当前选中的笔记
-         * 优先从分类缓存中查找；搜索态下也搜索 searchResults
+         * 笔记索引 Map（id → Note）
+         * 从所有分类缓存 + 搜索结果中聚合，供 O(1) 查找
+         * 仅 notesByCategory / searchResults 变化时重建
          */
-        activeNote(state): Note | null {
-            if (state.activeNoteId === null) return null;
-            // 先从分类缓存查找
+        noteMap(state): Map<number, Note> {
+            const map = new Map<number, Note>();
             for (const list of Object.values(state.notesByCategory)) {
-                const found = list.find((n) => n.id === state.activeNoteId);
-                if (found) return found;
+                for (const note of list) {
+                    map.set(note.id, note);
+                }
             }
-            // 搜索态下从搜索结果中查找（覆盖未加载过分类的笔记）
-            if (state.searchMode) {
-                const found = state.searchResults.find((n) => n.id === state.activeNoteId);
-                if (found) return found;
+            for (const note of state.searchResults) {
+                map.set(note.id, note);
             }
-            return null;
+            return map;
+        },
+
+        /**
+         * 当前选中的笔记（O(1) 查找）
+         */
+        activeNote(): Note | null {
+            if (this.activeNoteId === null) return null;
+            return this.noteMap.get(this.activeNoteId) ?? null;
         },
 
         /**

@@ -73,6 +73,11 @@ const isSaving = ref(false);
 /** 标题输入框 ref（用于自动聚焦） */
 const titleInputRef = ref<HTMLInputElement | null>(null);
 
+/** 切换笔记时的渲染中状态（显示骨架屏，等编辑器 setValue 完成后隐藏） */
+const isSwitchingNote = ref(false);
+/** 跳过下一次 watch(activeNoteId) 的草稿更新（由 handleSelectNote 延迟处理） */
+let skipNextDraftUpdate = false;
+
 // ==================== 侧边栏可调宽度 ====================
 
 /** 第一栏宽度（px），从 localStorage 恢复 */
@@ -290,25 +295,59 @@ const handleOpenCreateNote = async () => {
         content: "",
     });
     if (result) {
+        // 跳过 watch，由这里延迟赋值（与 handleSelectNote 同理，避免抢跑）
+        skipNextDraftUpdate = true;
         noteStore.selectNote(result.id);
-        // 聚焦标题输入框让用户立即改名
-        await nextTick();
-        titleInputRef.value?.focus();
+        // 新建笔记内容为空，setValue("") 极快，无需骨架屏
+        requestAnimationFrame(() => {
+            skipNextDraftUpdate = false;
+            draftTitle.value = result.title;
+            draftContent.value = result.content ?? "";
+            // 聚焦标题输入框让用户立即改名
+            nextTick(() => titleInputRef.value?.focus());
+        });
     }
 };
 
-/** 选中笔记 */
+/**
+ * 选中笔记
+ *
+ * 性能优化：高亮与内容渲染解耦
+ * 1. 立即同步选中（列表高亮即时响应，不阻塞）
+ * 2. 显示骨架屏占位
+ * 3. 双 rAF 延迟赋值 draftContent，让浏览器先 paint 高亮 + 骨架屏
+ *    随后 VditorEditor 的 watch 触发 setValue（同步阻塞），完成后通过 @rendered 隐藏骨架屏
+ */
 const handleSelectNote = (id: number) => {
+    // 1. 立即高亮（同步，不阻塞主线程）
+    skipNextDraftUpdate = true;
     noteStore.selectNote(id);
+
+    // 2. 显示骨架屏
+    isSwitchingNote.value = true;
+
+    // 3. 双 rAF：第一帧安排重排，第二帧浏览器完成 paint 后再执行 setValue
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            skipNextDraftUpdate = false;
+            const note = noteStore.activeNote;
+            draftTitle.value = note?.title ?? "";
+            draftContent.value = note?.content ?? "";
+            // setValue 在 VditorEditor watch 中同步执行
+            // 完成后通过 @rendered 事件隐藏骨架屏
+        });
+    });
 };
 
 /**
  * 同步草稿状态
  * 切换笔记时，从 noteStore.activeNote 读取最新值写入草稿
+ * 注意：handleSelectNote 会跳过此 watch（skipNextDraftUpdate），自行延迟赋值以实现骨架屏
  */
 watch(
     () => noteStore.activeNoteId,
     () => {
+        if (skipNextDraftUpdate) return;
         const note = noteStore.activeNote;
         draftTitle.value = note?.title ?? "";
         draftContent.value = note?.content ?? "";
@@ -318,6 +357,11 @@ watch(
 /** 编辑器内容变更 → 暂存到草稿 */
 const handleEditorChange = (value: string) => {
     draftContent.value = value;
+};
+
+/** 编辑器内容渲染完成，隐藏骨架屏 */
+const handleEditorRendered = () => {
+    isSwitchingNote.value = false;
 };
 
 /** 保存笔记（标题 + 内容） */
@@ -470,10 +514,21 @@ const handleSaveTitle = async () => {
 
         <!-- 编辑器主体 -->
         <div class="flex-1 overflow-hidden bg-white px-6 pb-6 pt-0">
+          <!-- 骨架屏：切换笔记时显示，等编辑器渲染完成后隐藏 -->
+          <div
+            v-if="isSwitchingNote"
+            class="flex h-full flex-col items-center justify-center gap-3"
+          >
+            <NSpin size="medium" />
+            <span class="text-sm text-slate-400">{{ t("note.editor.loading") }}</span>
+          </div>
+          <!-- 编辑器：保持挂载，用 v-show 控制可见性（避免重新初始化 Vditor） -->
           <NoteEditor
+            v-show="!isSwitchingNote"
             :model-value="draftContent"
             height="100%"
             @update:model-value="handleEditorChange"
+            @rendered="handleEditorRendered"
           />
         </div>
       </template>

@@ -19,6 +19,8 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: "update:modelValue", value: string): void;
     (e: "ready"): void;
+    /** 内容渲染完成（转发自 VditorEditor，用于隐藏骨架屏） */
+    (e: "rendered"): void;
 }>();
 
 /** 内容变更事件转发 */
@@ -30,6 +32,11 @@ const handleUpdate = (value: string) => {
 const handleReady = () => {
     emit("ready");
 };
+
+/** 内容渲染完成事件转发 */
+const handleRendered = () => {
+    emit("rendered");
+};
 </script>
 
 <template>
@@ -39,6 +46,7 @@ const handleReady = () => {
       :placeholder="t('note.editor.placeholder')"
       @update:model-value="handleUpdate"
       @ready="handleReady"
+      @rendered="handleRendered"
     />
   </div>
 </template>
