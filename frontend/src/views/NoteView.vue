@@ -817,6 +817,17 @@ const handleSaveTitle = async () => {
         <ZIcon name="ri:arrow-left-line" :size="18" color="currentColor" />
         <span>{{ t("note.mobile.back") }}</span>
       </button>
+      <!-- 移动端保存按钮（右侧） -->
+      <button
+        v-if="hasActiveNote"
+        class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="isSaving"
+        :title="t('note.editor.save')"
+        @click="handleSaveNote"
+      >
+        <ZIcon v-if="!isSaving" name="ri:save-line" :size="20" color="currentColor" />
+        <ZIcon v-else name="ri:loader-4-line" :size="20" color="currentColor" class="animate-spin" />
+      </button>
     </div>
 
     <!-- 侧边栏抽屉（Teleport 到 body 避免层叠上下文问题） -->
