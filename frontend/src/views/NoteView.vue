@@ -489,7 +489,7 @@ const handleSelectNote = async (id: number) => {
 /** 移动端返回笔记列表 */
 const handleMobileBack = () => {
     drawerOpen.value = false;
-    router.back();
+    router.push('/note');
 };
 
 /**
