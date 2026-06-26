@@ -1,27 +1,21 @@
 export const menuConfig = [
     {
-        id: "notes",
-        titleKey: "menu.notes",
-        icon: "ri:booklet-line",
-        route: "/app",
-    },
-    {
         id: "home",
         titleKey: "dashboard.home",
         icon: "ri:dashboard-line",
         route: "/dashboard/home",
     },
     {
+        id: "notes",
+        titleKey: "menu.notes",
+        icon: "ri:booklet-line",
+        route: "/app",
+    },
+    {
         id: "users",
         titleKey: "dashboard.users",
         icon: "ri:user-line",
         route: "/dashboard/users",
-    },
-    {
-        id: "templates",
-        titleKey: "dashboard.templates",
-        icon: "ri:layout-4-line",
-        route: "/dashboard/templates",
     },
     {
         id: "settings",
