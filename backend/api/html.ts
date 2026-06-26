@@ -1,9 +1,18 @@
 import { Context } from "hono";
 import { html } from "hono/html";
 import { APP_DATE } from "@/api/info";
+import { checkSystemInitialized } from "@/api/system";
 import { getAppName } from "@/utils/helper";
 
 export const index = async (c: Context) => {
+    // 首页路由检查系统初始化状态，未初始化则重定向到初始化页面
+    if (c.req.path === "/") {
+        const initialized = await checkSystemInitialized();
+        if (!initialized) {
+            return c.redirect("/user/init", 302);
+        }
+    }
+
     const title = getAppName();
 
     return c.html(html`<!DOCTYPE html>
