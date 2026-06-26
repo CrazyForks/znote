@@ -74,7 +74,7 @@ const primaryCtaLabel = computed(() => {
 /** Hero 主按钮跳转目标 */
 const primaryCtaPath = computed(() => {
     if (!systemStore.status.initialized) return "/user/init";
-    return isLoggedIn.value ? "/note" : "/user/login";
+    return isLoggedIn.value ? "/app" : "/user/login";
 });
 
 // ==================== 滚动 ====================
@@ -112,7 +112,7 @@ onMounted(() => {
         <div class="flex items-center gap-2 sm:gap-3">
           <!-- 已登录：显示「我的笔记」 -->
           <template v-if="isLoggedIn">
-            <button class="btn-base btn-primary btn-md" @click="router.push('/note')">
+            <button class="btn-base btn-primary btn-md" @click="router.push('/app')">
               <ZIcon name="ri:edit-box-line" :size="16" color="currentColor" />
               <span>{{ t("home.nav.notes") }}</span>
             </button>
