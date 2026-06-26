@@ -177,7 +177,7 @@ const handleImport = async () => {
           :disabled="!selectedFile || importing"
           @click="handleImport"
         >
-          <NSpin v-if="importing" :size="14" stroke-width="14" />
+          <NSpin v-if="importing" :size="14" :stroke-width="14" />
           {{ t("import.start") }}
         </button>
       </div>

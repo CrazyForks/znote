@@ -85,8 +85,10 @@ onMounted(() => {
             fieldName: "file[]",
             /** 每次上传前动态设置 Bearer Token 认证头 */
             setHeaders() {
+                const headers: Record<string, string> = {};
                 const token = localStorage.getItem("token");
-                return token ? { Authorization: `Bearer ${token}` } : {};
+                if (token) headers.Authorization = `Bearer ${token}`;
+                return headers;
             },
             /** 将响应格式转换为 Vditor 内置数据结构 */
             format(_files: File[], responseText: string): string {
