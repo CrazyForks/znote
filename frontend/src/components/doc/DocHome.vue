@@ -6,6 +6,7 @@
 import { computed, inject, ref, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import ZIcon from "@/components/DynamicIcon.vue";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -59,15 +60,13 @@ const goToNote = (noteId: number) => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-8">
+  <div class="mx-auto max-w-3xl px-2 sm:px-6 py-4 sm:py-8">
     <!-- 空状态 -->
     <div
       v-if="tree.length === 0"
       class="flex flex-col items-center justify-center py-24 text-slate-400"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3 opacity-40">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-      </svg>
+      <ZIcon name="ri:file-text-line" :size="48" class="mb-3 opacity-40" />
       <span class="text-sm">{{ t("doc.home.empty") }}</span>
     </div>
 
@@ -80,9 +79,7 @@ const goToNote = (noteId: number) => {
       >
         <!-- 分类标题行：名称 | 笔记数量 -->
         <div class="mb-2 flex items-baseline gap-2 border-b border-slate-100 pb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 flex-shrink-0">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
+          <ZIcon name="ri:folder-line" :size="16" class="text-slate-400 flex-shrink-0" />
           <h3 class="font-semibold text-slate-800">{{ section.category.title }}</h3>
           <span class="text-xs text-slate-400">{{ countAllNotes(section.category) }} {{ t("doc.home.note_count") }}</span>
         </div>
@@ -95,9 +92,7 @@ const goToNote = (noteId: number) => {
           @click="goToNote(note.id)"
         >
           <div class="flex w-full items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="flex-shrink-0 text-slate-300 group-hover:text-blue-400">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
+            <ZIcon name="ri:file-text-line" :size="14" class="flex-shrink-0 text-slate-300 group-hover:text-blue-400" />
             <span class="truncate text-sm text-slate-700 group-hover:text-blue-600">{{ note.title }}</span>
             <span class="mx-2 flex-1 border-b border-dashed border-slate-200" />
             <span class="flex-shrink-0 text-xs text-slate-400">{{ formatDate(note.updated_at || note.created_at) }}</span>

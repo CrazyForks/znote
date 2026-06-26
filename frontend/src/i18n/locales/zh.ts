@@ -344,4 +344,5 @@ export default {
     "doc.note.created_at": "创建于",
     "doc.note.load_failed": "加载笔记失败，请稍后重试",
     "doc.breadcrumb.home": "文档首页",
+    "doc.footer.built_with": "此文档由 {znote} 构建",
 };

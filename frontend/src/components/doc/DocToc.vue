@@ -6,6 +6,7 @@
  */
 import { computed, inject, ref, onMounted, onUnmounted, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
+import ZIcon from "@/components/DynamicIcon.vue";
 
 const { t } = useI18n();
 
@@ -122,9 +123,7 @@ onUnmounted(() => {
       class="fixed bottom-6 right-6 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-slate-200 transition hover:bg-slate-50"
       @click="showMobileToc = !showMobileToc"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-600">
-        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-      </svg>
+      <ZIcon name="ri:list-unordered" :size="18" class="text-slate-600" />
     </button>
 
     <!-- 弹出目录面板 -->
@@ -140,7 +139,7 @@ onUnmounted(() => {
             class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             @click="showMobileToc = false; emit('close')"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <ZIcon name="ri:close-line" :size="18" />
           </button>
         </div>
         <nav class="flex-1 overflow-y-auto px-4 py-3">

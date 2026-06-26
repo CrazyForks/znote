@@ -53,6 +53,11 @@ const router = createRouter({
                     component: () => import("@/components/doc/DocHome.vue"),
                 },
                 {
+                    path: "notebook/:notebookId",
+                    name: "docCategory",
+                    component: () => import("@/components/doc/DocCategory.vue"),
+                },
+                {
                     path: "note/:noteId",
                     name: "docNote",
                     component: () => import("@/components/doc/DocNote.vue"),

@@ -5,6 +5,7 @@
  */
 import { computed, inject, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
+import ZIcon from "@/components/DynamicIcon.vue";
 import DocTreeNode from "@/components/doc/DocTreeNode.vue";
 
 const { t } = useI18n();
@@ -54,20 +55,22 @@ const hasActiveNote = computed(() => activeNoteId.value !== null);
     <!-- 搜索框 -->
     <div class="border-b border-slate-100 p-3">
       <div class="relative">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14" height="14"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-        >
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
+        <ZIcon name="ri:search-line" :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           v-model="searchKeyword"
           type="text"
           :placeholder="t('doc.search.placeholder')"
-          class="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+          class="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-7 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+          @keydown.esc="searchKeyword = ''"
         />
+        <!-- 清空按钮 -->
+        <button
+          v-if="searchKeyword"
+          class="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          @click="searchKeyword = ''"
+        >
+          <ZIcon name="ri:close-line" :size="10" />
+        </button>
       </div>
     </div>
 
@@ -78,9 +81,7 @@ const hasActiveNote = computed(() => activeNoteId.value !== null);
         v-if="tree.length === 0"
         class="flex flex-col items-center justify-center py-12 text-slate-400"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-2 opacity-50">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-        </svg>
+        <ZIcon name="ri:file-text-line" :size="32" class="mb-2 opacity-50" />
         <span class="text-xs">{{ t("doc.tree.empty") }}</span>
       </div>
 

@@ -4,11 +4,11 @@
  * - 分类节点：点击箭头可折叠/展开子节点，点击名称高亮（桌面端跳转到分类附近）
  * - 笔记节点：点击跳转到笔记详情页面
  */
-import { computed, ref } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { computed, inject, ref, type Ref } from "vue";
+import { useRouter } from "vue-router";
+import ZIcon from "@/components/DynamicIcon.vue";
 
 const router = useRouter();
-const route = useRoute();
 
 const props = defineProps<{
     /** 树节点数据 */
@@ -27,28 +27,25 @@ const props = defineProps<{
     searchKeyword: string;
 }>();
 
+/** 注入当前激活的分类 ID */
+const activeNotebookId = inject<Ref<number | null>>("activeNotebookId", ref(null));
+
 /** 分类节点是否展开 */
 const expanded = ref(true);
 
-/** 当前分类是否处于激活路径（其下有当前笔记） */
+/** 当前分类是否处于激活状态（当前打开的分类页） */
 const isActive = computed(() => {
-    if (!props.activeNoteId) return false;
-    // 检查直接笔记
-    if (props.node.notes.some((n) => n.id === props.activeNoteId)) return true;
-    // 递归检查子分类
-    return props.node.children.some((c) => checkChildActive(c));
+    return activeNotebookId.value === props.node.id;
 });
-
-/** 递归检查子分类是否包含当前笔记 */
-const checkChildActive = (child: any): boolean => {
-    if (child.notes && child.notes.some((n: any) => n.id === props.activeNoteId)) return true;
-    if (child.children) return child.children.some((c: any) => checkChildActive(c));
-    return false;
-};
 
 /** 切换展开/折叠 */
 const toggleExpand = () => {
     expanded.value = !expanded.value;
+};
+
+/** 点击分类名称跳转到分类页面 */
+const goToNotebook = (id: number) => {
+    router.push(`/doc/${props.slug}/notebook/${id}`);
 };
 
 /** 点击笔记跳转 */
@@ -68,32 +65,22 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 <template>
   <div class="select-none">
-    <!-- 分类标题行 -->
+    <!-- 分类标题行：点击名称跳转分类页，箭头折叠/展开 -->
     <div
       class="group flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm transition"
       :class="isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-100'"
+      @click="goToNotebook(node.id)"
     >
-      <!-- 折叠箭头 -->
+      <!-- 折叠箭头（阻止事件冒泡，避免触发分类跳转） -->
       <button
         class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-slate-400 transition hover:text-slate-600"
-        @click="toggleExpand"
+        @click.stop="toggleExpand"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12" height="12"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          class="transition-transform"
-          :class="expanded ? 'rotate-90' : ''"
-        >
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
+        <ZIcon name="ri:arrow-right-s-line" :size="12" class="transition-transform" :class="expanded ? 'rotate-90' : ''" />
       </button>
       <!-- 分类图标 -->
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="flex-shrink-0 opacity-60">
-        <path v-if="expanded" d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-        <path v-else d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-      <span class="truncate text-xs font-medium" v-html="highlightText(node.title)"></span>
+      <ZIcon :name="expanded ? 'ri:folder-open-line' : 'ri:folder-line'" :size="14" class="flex-shrink-0 opacity-60" />
+      <span class="truncate text-sm font-medium" v-html="highlightText(node.title)"></span>
       <!-- 笔记数量 -->
       <span class="ml-auto flex-shrink-0 text-xs text-slate-400">{{ node.notes.length + node.children.reduce((s: number, c: any) => s + (c.notes?.length || 0), 0) }}</span>
     </div>
@@ -104,13 +91,11 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       <div
         v-for="note in node.notes"
         :key="note.id"
-        class="group flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition"
+        class="group flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm transition"
         :class="activeNoteId === note.id ? 'bg-blue-50 text-blue-600 font-medium' : 'text-slate-600 hover:bg-slate-100'"
         @click="goToNote(note.id)"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="flex-shrink-0 opacity-50">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-        </svg>
+        <ZIcon name="ri:file-text-line" :size="14" class="flex-shrink-0 opacity-50" />
         <span class="truncate" v-html="highlightText(note.title)"></span>
       </div>
 

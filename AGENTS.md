@@ -12,6 +12,7 @@
 | ORM | Drizzle ORM |
 | 国际化 | vue-i18n (中/英) |
 | 状态管理 | Pinia |
+| 图标组件 | DynamicIcon.vue，引入为ZIcon |
 
 ---
 

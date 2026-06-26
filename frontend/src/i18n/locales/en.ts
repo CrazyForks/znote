@@ -344,4 +344,5 @@ export default {
     "doc.note.created_at": "Created at",
     "doc.note.load_failed": "Failed to load note, please try again",
     "doc.breadcrumb.home": "Docs Home",
+    "doc.footer.built_with": "Built with {znote}",
 };

@@ -13,6 +13,7 @@ import DocBreadcrumb from "@/components/doc/DocBreadcrumb.vue";
 import DocHeader from "@/components/doc/DocHeader.vue";
 import DocSidebar from "@/components/doc/DocSidebar.vue";
 import DocToc from "@/components/doc/DocToc.vue";
+import ZIcon from "@/components/DynamicIcon.vue";
 
 const route = useRoute();
 const { t } = useI18n();
@@ -24,6 +25,12 @@ const slug = computed(() => route.params.slug as string);
 const activeNoteId = computed<number | null>(() => {
     const noteId = Number(route.params.noteId);
     return noteId && !isNaN(noteId) ? noteId : null;
+});
+
+/** 当前激活的分类 ID（路由参数，可能为 null） */
+const activeNotebookId = computed<number | null>(() => {
+    const id = Number(route.params.notebookId);
+    return id && !isNaN(id) ? id : null;
 });
 
 /** 侧栏开关（移动端抽屉） */
@@ -76,6 +83,7 @@ const fetchDoc = async () => {
 provide("docTree", tree);
 provide("docInfo", docInfo);
 provide("activeNoteId", activeNoteId);
+provide("activeNotebookId", activeNotebookId);
 provide("slug", slug.value);
 provide("headings", headings);
 provide("contentRef", contentRef);
@@ -95,6 +103,11 @@ onMounted(async () => {
 watch(slug, () => {
     void fetchDoc();
 });
+
+/** 导航跳转时自动关闭移动端侧栏 */
+watch(() => route.fullPath, () => {
+    sidebarOpen.value = false;
+});
 </script>
 
 <template>
@@ -111,9 +124,7 @@ watch(slug, () => {
     v-else-if="error"
     class="flex h-screen flex-col items-center justify-center bg-slate-50 text-slate-500"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-4 opacity-40">
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
+    <ZIcon name="ri:error-warning-line" :size="48" class="mb-4 opacity-40" />
     <p class="text-sm">{{ error }}</p>
   </div>
 
@@ -129,7 +140,7 @@ watch(slug, () => {
     <div class="flex flex-1 overflow-hidden">
       <!-- 左侧栏：PC 固定 | 移动端抽屉 -->
       <!-- PC 侧栏 -->
-      <div class="hidden w-[260px] flex-shrink-0 lg:block">
+      <div class="hidden w-[320px] flex-shrink-0 lg:block">
         <DocSidebar />
       </div>
 
@@ -138,10 +149,9 @@ watch(slug, () => {
         <div
           v-if="sidebarOpen"
           class="fixed inset-0 z-30 pt-12 lg:hidden"
-          @click.self="sidebarOpen = false"
         >
-          <div class="absolute inset-0 bg-black/30" />
-          <div class="relative z-40 h-full w-[280px] max-w-[85vw]">
+          <div class="absolute inset-0 bg-black/30" @click="sidebarOpen = false" />
+          <div class="relative z-40 h-full w-[300px] max-w-[85vw]">
             <DocSidebar />
           </div>
         </div>
@@ -157,6 +167,15 @@ watch(slug, () => {
           <DocBreadcrumb />
           <div class="mb-4 rounded-2xl border border-slate-100 bg-white px-6 py-6 shadow-sm">
             <router-view />
+          </div>
+          <!-- 版权信息 -->
+          <div class="pb-6 text-center text-xs text-slate-400">
+            &copy; {{ new Date().getFullYear() }}&nbsp;
+            <i18n-t keypath="doc.footer.built_with" tag="span">
+              <template #znote>
+                <a href="https://github.com/helloxz/znote" target="_blank" class="text-blue-500 hover:underline">ZNote</a>
+              </template>
+            </i18n-t>
           </div>
         </div>
       </main>

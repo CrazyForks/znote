@@ -356,6 +356,13 @@ export const getPublicDoc = async (c: Context) => {
         return c.json({ code: -1000, msg: "doc.public.not_found", data: null });
     }
 
+    // 查询根笔记本的标题和描述，作为自定义为空时的兜底
+    const rootNotebook = await db
+        .select({ title: schema.notebooks.title, description: schema.notebooks.description })
+        .from(schema.notebooks)
+        .where(eq(schema.notebooks.id, doc.notebook_id))
+        .get();
+
     // 收集子树所有分类 ID
     const notebookIds = await collectSubtreeIds(doc.notebook_id);
     const idList = [...notebookIds];
@@ -429,8 +436,8 @@ export const getPublicDoc = async (c: Context) => {
         msg: "doc.public.success",
         data: {
             doc: {
-                title: doc.title,
-                description: doc.description,
+                title: doc.title || (rootNotebook?.title || ""),
+                description: doc.description || (rootNotebook?.description || ""),
                 keywords: doc.keywords,
             },
             tree,
