@@ -499,7 +499,7 @@ const handleOpenCreateNote = async () => {
 /** 选中笔记（同时更新 URL；await 等待 selectNote 内部数据就绪后再路由） */
 const handleSelectNote = async (id: number) => {
     await noteStore.selectNote(id);
-    router.push(`/app/${id}`);
+    router.push(`/app/note/${id}`);
 };
 
 /** 移动端返回笔记列表 */

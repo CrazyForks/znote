@@ -187,7 +187,7 @@ const handleContextMenu = (note: Note, e: MouseEvent) => {
  */
 const handleMenuSelect = async (action: NoteContextAction, note: Note) => {
     if (action === "open_new_window") {
-        window.open(`/app/${note.id}`, "_blank");
+        window.open(`/app/note/${note.id}`, "_blank");
         return;
     }
     if (action === "trash") {
