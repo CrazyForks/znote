@@ -24,7 +24,7 @@ import { listNoteVersions, getNoteVersion } from "@/api/note_version";
 import { importZip } from "@/api/import";
 import { uploadFiles } from "@/api/file";
 import { searchNotes } from "@/api/search";
-import { listDocs, createDoc, updateDoc, deleteDoc } from "@/api/doc";
+import { listDocs, createDoc, updateDoc, deleteDoc, getAllTopLevelNotebooks, getPublicDoc, getPublicNote } from "@/api/doc";
 import { verifyApiToken } from "@/middleware/auth";
 import type { AppVariables } from "@/types";
 
@@ -74,7 +74,11 @@ publicRouter.get("/user", index);
 publicRouter.get("/user/*", index);
 publicRouter.get("/app", index);
 publicRouter.get("/app/*", index);
+publicRouter.get("/doc", index);
+publicRouter.get("/doc/*", index);
 
+publicRouter.get("/api/doc/:slug", getPublicDoc);
+publicRouter.get("/api/doc/:slug/note/:noteId", getPublicNote);
 publicRouter.get("/api/system/status", getSystemStatus);
 publicRouter.post("/api/init_user", initUser);
 publicRouter.post("/api/login", login);
@@ -114,6 +118,8 @@ userRouter.post("/file/upload", uploadFiles);
 adminRouter.get("/app_info", getAppInfo);
 adminRouter.get("/list_users", listUsers);
 adminRouter.post("/reset_user_password", resetUserPassword);
+
+adminRouter.get("/notebook/top", getAllTopLevelNotebooks);
 
 adminRouter.get("/doc/list", listDocs);
 adminRouter.post("/doc/create", createDoc);

@@ -12,6 +12,12 @@ export const menuConfig = [
         route: "/app",
     },
     {
+        id: "docs",
+        titleKey: "dashboard.docs",
+        icon: "ri:file-text-line",
+        route: "/dashboard/docs",
+    },
+    {
         id: "users",
         titleKey: "dashboard.users",
         icon: "ri:user-line",

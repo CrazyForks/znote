@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import ZIcon from "@/components/DynamicIcon.vue";
 import { menuConfig } from "@/config/menu";
 import HomePanel from "@/components/dashboard/HomePanel.vue";
+import DocsPanel from "@/components/dashboard/DocsPanel.vue";
 import UsersPanel from "@/components/dashboard/UsersPanel.vue";
 import TemplatePanel from "@/components/dashboard/TemplatePanel.vue";
 import SystemPanel from "@/components/dashboard/SystemPanel.vue";
@@ -25,6 +26,7 @@ const currentComponent = shallowRef(HomePanel);
 
 const componentMap: Record<string, any> = {
     home: HomePanel,
+    docs: DocsPanel,
     users: UsersPanel,
     templates: TemplatePanel,
     settings: SystemPanel,
