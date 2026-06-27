@@ -73,10 +73,10 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     >
       <!-- 折叠箭头（阻止事件冒泡，避免触发分类跳转） -->
       <button
-        class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-slate-400 transition hover:text-slate-600"
+        class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-slate-400 transition hover:text-slate-600"
         @click.stop="toggleExpand"
       >
-        <ZIcon name="ri:arrow-right-s-line" :size="12" class="transition-transform" :class="expanded ? 'rotate-90' : ''" />
+        <ZIcon name="ri:arrow-right-s-line" :size="18" class="transition-transform" :class="expanded ? 'rotate-90' : ''" />
       </button>
       <!-- 分类图标 -->
       <ZIcon :name="expanded ? 'ri:folder-open-line' : 'ri:folder-line'" :size="14" class="flex-shrink-0 opacity-60" />
