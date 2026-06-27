@@ -41,6 +41,7 @@ const columns = [
         title: t("panel.users.col.actions"),
         key: "actions",
         width: 160,
+        fixed: "right",
         render: (row: any) => row.role === "user"
             ? h(
                 NButton,
@@ -62,11 +63,10 @@ onMounted(() => {
       <div class="mb-4 flex items-center justify-between">
         <div>
           <h2 class="text-xl font-semibold text-slate-900">{{ t("panel.users.title") }}</h2>
-          <p class="mt-1 text-sm text-slate-500">{{ t("panel.users.description") }}</p>
         </div>
         <NButton @click="fetchUsers">{{ t("panel.users.refresh") }}</NButton>
       </div>
-      <NDataTable :columns="columns" :data="rows" :loading="loading" />
+      <NDataTable :columns="columns" :data="rows" :loading="loading" :scroll-x="900" />
     </NCard>
   </div>
 </template>

@@ -79,7 +79,12 @@ const columns = [
         title: t("doc.panel.col.slug"),
         key: "slug",
         width: 140,
-        render: (row: any) => `/${row.slug}`,
+        render: (row: any) =>
+            h("a", {
+                href: `/doc/${row.slug}`,
+                target: "_blank",
+                class: "text-blue-600 hover:underline cursor-pointer",
+            }, `/${row.slug}`),
     },
     {
         title: t("doc.panel.col.title"),
@@ -98,18 +103,10 @@ const columns = [
         },
     },
     {
-        title: t("doc.panel.col.created_at"),
-        key: "created_at",
-        width: 160,
-        render: (row: any) => {
-            if (!row.created_at) return "-";
-            return new Date(row.created_at * 1000).toLocaleString();
-        },
-    },
-    {
         title: t("doc.panel.col.actions"),
         key: "actions",
         width: 80,
+        fixed: "right",
         render: (row: any) =>
             h(
                 NButton,
@@ -130,7 +127,6 @@ onMounted(() => {
       <div class="mb-4 flex items-center justify-between">
         <div>
           <h2 class="text-xl font-semibold text-slate-900">{{ t("doc.panel.title") }}</h2>
-          <p class="mt-1 text-sm text-slate-500">{{ t("doc.panel.description") }}</p>
         </div>
         <div class="flex gap-2">
           <NButton type="primary" @click="handleCreate">{{ t("doc.panel.create") }}</NButton>
@@ -145,6 +141,7 @@ onMounted(() => {
         :loading="loading"
         :row-key="(row: any) => row.id"
         v-model:checked-row-keys="checkedRowKeys"
+        :scroll-x="800"
       />
     </NCard>
 
