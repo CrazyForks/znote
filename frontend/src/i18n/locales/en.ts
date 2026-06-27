@@ -345,4 +345,7 @@ export default {
     "doc.note.load_failed": "Failed to load note, please try again",
     "doc.breadcrumb.home": "Docs Home",
     "doc.footer.built_with": "Built with {znote}",
+    "notfound.title": "404",
+    "notfound.description": "Sorry, the page you visited does not exist",
+    "notfound.back_home": "Back to Home",
 };

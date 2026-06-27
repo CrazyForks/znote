@@ -345,4 +345,7 @@ export default {
     "doc.note.load_failed": "加载笔记失败，请稍后重试",
     "doc.breadcrumb.home": "文档首页",
     "doc.footer.built_with": "此文档由 {znote} 构建",
+    "notfound.title": "404",
+    "notfound.description": "抱歉，您访问的页面不存在",
+    "notfound.back_home": "返回首页",
 };
