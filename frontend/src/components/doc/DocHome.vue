@@ -3,10 +3,11 @@
  * 文档首页·语雀式目录清单
  * 按分类分组，平铺展示所有笔记，格式：左侧标题 | 右侧更新时间
  */
-import { computed, inject, ref, type Ref } from "vue";
+import { inject, ref, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ZIcon from "@/components/DynamicIcon.vue";
+import { useFlattenDocTree, countAllNotes } from "@/composables/useFlattenDocTree";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -26,32 +27,7 @@ const formatDate = (val: any): string => {
     });
 };
 
-/** 递归计算分类及其子分类下的笔记总数 */
-const countAllNotes = (node: any): number => {
-    let count = (node.notes || []).length;
-    for (const child of node.children || []) {
-        count += countAllNotes(child);
-    }
-    return count;
-};
-
-/** 递归平铺：按分类分组输出笔记列表，depth 记录层级深度用于缩进 */
-const flattenTree = (nodes: any[], depth = 0): { category: any; notes: any[]; depth: number }[] => {
-    const result: { category: any; notes: any[]; depth: number }[] = [];
-    for (const node of nodes) {
-        // 当前分类的笔记
-        if (node.notes && node.notes.length > 0) {
-            result.push({ category: node, notes: node.notes, depth });
-        }
-        // 递归子分类（深度 +1）
-        if (node.children && node.children.length > 0) {
-            result.push(...flattenTree(node.children, depth + 1));
-        }
-    }
-    return result;
-};
-
-const sections = computed(() => flattenTree(tree.value));
+const { sections } = useFlattenDocTree(tree);
 
 /** 点击笔记跳转 */
 const goToNote = (noteId: number) => {

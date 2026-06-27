@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 分类页：展示某个分类下的所有笔记列表
- * 类似 DocHome 的目录列表，但范围限定为该分类及其子分类
+ * 分类页：展示某个分类及其子分类下的所有笔记
+ * 复用 useFlattenDocTree 把当前分类作为子树根传入，渲染结构与 DocHome 完全一致
  */
 import { computed, inject, ref, type Ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ZIcon from "@/components/DynamicIcon.vue";
+import { useFlattenDocTree, countAllNotes } from "@/composables/useFlattenDocTree";
 
 const route = useRoute();
 const router = useRouter();
@@ -33,20 +34,9 @@ const findNode = (nodes: any[], id: number): any | null => {
 /** 当前分类节点 */
 const categoryNode = computed(() => findNode(tree.value, notebookId.value));
 
-/** 递归收集该分类及其子分类下的所有笔记 */
-const collectNotes = (node: any): any[] => {
-    const notes: any[] = [...(node.notes || [])];
-    for (const child of node.children || []) {
-        notes.push(...collectNotes(child));
-    }
-    return notes;
-};
-
-/** 该分类下的所有笔记（含子分类） */
-const allNotes = computed(() => {
-    if (!categoryNode.value) return [];
-    return collectNotes(categoryNode.value);
-});
+/** 把当前分类包成单元素子树传入 composable，递归时从 depth=0 开始 */
+const subTree = computed(() => (categoryNode.value ? [categoryNode.value] : []));
+const { sections } = useFlattenDocTree(subTree);
 
 /** 格式化日期 */
 const formatDate = (val: any): string => {
@@ -68,34 +58,46 @@ const goToNote = (noteId: number) => {
 
 <template>
   <div v-if="categoryNode">
-    <!-- 分类标题 -->
-    <div class="mb-4 flex items-baseline gap-2">
-      <ZIcon name="ri:folder-line" :size="18" class="text-slate-400 flex-shrink-0" />
-      <h1 class="text-lg font-semibold text-slate-800">{{ categoryNode.title }}</h1>
-      <span class="text-xs text-slate-400">{{ allNotes.length }} {{ t("doc.home.note_count") }}</span>
+    <!-- 空状态 -->
+    <div
+      v-if="sections.length === 0"
+      class="flex flex-col items-center justify-center py-16 text-slate-400"
+    >
+      <ZIcon name="ri:file-text-line" :size="40" class="mb-3 opacity-50" />
+      <span class="text-sm">{{ t("doc.home.empty") }}</span>
     </div>
 
-    <!-- 笔记列表 -->
-    <template v-if="allNotes.length > 0">
+    <!-- 分类分组列表（与 DocHome 一致） -->
+    <template v-else>
       <div
-        v-for="note in allNotes"
-        :key="note.id"
-        class="group flex cursor-pointer items-center rounded-lg px-3 py-2 transition hover:bg-slate-50"
-        @click="goToNote(note.id)"
+        v-for="section in sections"
+        :key="section.category.id"
+        :style="{ paddingLeft: section.depth * 20 + 'px' }"
+        class="mb-6"
       >
-        <div class="flex w-full items-center gap-2">
-          <ZIcon name="ri:file-text-line" :size="14" class="flex-shrink-0 text-slate-300 group-hover:text-blue-400" />
-          <span class="truncate text-sm text-slate-700 group-hover:text-blue-600">{{ note.title }}</span>
-          <span class="mx-2 flex-1 border-b border-dashed border-slate-200" />
-          <span class="flex-shrink-0 text-xs text-slate-400">{{ formatDate(note.updated_at) }}</span>
+        <!-- 分类标题行：名称 | 笔记数量 -->
+        <div class="mb-2 flex items-baseline gap-2 border-b border-slate-100 pb-2">
+          <ZIcon name="ri:folder-line" :size="16" class="text-slate-400 flex-shrink-0" />
+          <h3 class="font-semibold text-slate-800">{{ section.category.title }}</h3>
+          <span class="text-xs text-slate-400">{{ countAllNotes(section.category) }} {{ t("doc.home.note_count") }}</span>
+        </div>
+
+        <!-- 笔记条目列表：标题 ···· 更新时间 -->
+        <div
+          v-for="note in section.notes"
+          :key="note.id"
+          class="group flex cursor-pointer items-center rounded-lg px-3 py-2 transition hover:bg-slate-50"
+          @click="goToNote(note.id)"
+        >
+          <div class="flex w-full items-center gap-2">
+            <ZIcon name="ri:file-text-line" :size="14" class="flex-shrink-0 text-slate-300 group-hover:text-blue-400" />
+            <span class="truncate text-sm text-slate-700 group-hover:text-blue-600">{{ note.title }}</span>
+            <span class="mx-2 flex-1 border-b border-dashed border-slate-200" />
+            <span class="flex-shrink-0 text-xs text-slate-400">{{ formatDate(note.updated_at) }}</span>
+          </div>
         </div>
       </div>
     </template>
-
-    <!-- 空状态 -->
-    <div v-else class="py-16 text-center text-xs text-slate-400">
-      {{ t("doc.home.empty") }}
-    </div>
   </div>
 
   <!-- 分类不存在 -->
