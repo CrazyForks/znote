@@ -10412,8 +10412,8 @@ var getBearerToken = (c) => {
 };
 
 // backend/api/info.ts
-var APP_VERSION = "0.2.0";
-var APP_DATE = "2026062703";
+var APP_VERSION = "0.2.1";
+var APP_DATE = "2026062709";
 var getAppInfo = async (c) => {
   const userCount = await db.select({ count: count() }).from(users);
   return c.json({
@@ -10732,6 +10732,7 @@ var changePassword = async (c) => {
     return c.json({ code: -1000, msg: "user.old_password.invalid", data: null });
   }
   await db.update(users).set({ password: enPassword(username, new_password), updated_at: new Date }).where(eq2(users.id, uid)).run();
+  await db.update(sessions).set({ status: "revoked" }).where(and(eq2(sessions.uid, uid), eq2(sessions.status, "active"))).run();
   return c.json({ code: 200, msg: "user.password.update.success", data: null });
 };
 var checkLogin = async (c) => {
@@ -11325,6 +11326,65 @@ var sortNotes = async (c) => {
     data: notes2
   });
 };
+var emptyTrash = async (c) => {
+  const uid = Number(c.get("uid"));
+  const BATCH_SIZE = 30;
+  const trashedNotes = await db.select({ id: notes.id }).from(notes).where(and4(eq5(notes.user_id, uid), eq5(notes.is_deleted, 1))).all();
+  if (trashedNotes.length === 0) {
+    return c.json({
+      code: 200,
+      msg: "note.trash.empty.success",
+      data: { deleted: 0 }
+    });
+  }
+  const noteIds = trashedNotes.map((n) => n.id);
+  let totalDeleted = 0;
+  for (let i = 0;i < noteIds.length; i += BATCH_SIZE) {
+    const batchIds = noteIds.slice(i, i + BATCH_SIZE);
+    try {
+      const notes2 = await db.select({ id: notes.id, content: notes.content }).from(notes).where(and4(inArray2(notes.id, batchIds), eq5(notes.user_id, uid))).all();
+      const versions = await db.select({ note_id: noteVersions.note_id, content: noteVersions.content }).from(noteVersions).where(and4(inArray2(noteVersions.note_id, batchIds), eq5(noteVersions.user_id, uid))).all();
+      const allContents = [
+        ...notes2.map((n) => n.content),
+        ...versions.map((v) => v.content)
+      ].filter(Boolean);
+      const fileIdSet = new Set;
+      const reg = /zn-[A-Za-z0-9]{8}/g;
+      for (const text2 of allContents) {
+        const matches = text2.matchAll(reg);
+        for (const m of matches) {
+          fileIdSet.add(m[0]);
+        }
+      }
+      const filePaths = [];
+      if (fileIdSet.size > 0) {
+        const fileRecords = await db.select({ file_path: files.file_path }).from(files).where(and4(inArray2(files.file_id, [...fileIdSet]), eq5(files.user_id, uid))).all();
+        filePaths.push(...fileRecords.map((f) => f.file_path));
+      }
+      await db.transaction(async (tx) => {
+        await tx.delete(noteVersions).where(and4(inArray2(noteVersions.note_id, batchIds), eq5(noteVersions.user_id, uid)));
+        if (fileIdSet.size > 0) {
+          await tx.delete(files).where(and4(inArray2(files.file_id, [...fileIdSet]), eq5(files.user_id, uid)));
+        }
+        await tx.delete(notes).where(and4(inArray2(notes.id, batchIds), eq5(notes.user_id, uid)));
+      });
+      for (const relativePath of filePaths) {
+        try {
+          const fullPath = join3(FILES_BASE_PATH, relativePath);
+          if (existsSync2(fullPath)) {
+            unlinkSync(fullPath);
+          }
+        } catch {}
+      }
+      totalDeleted += notes2.length;
+    } catch {}
+  }
+  return c.json({
+    code: 200,
+    msg: "note.trash.empty.success",
+    data: { deleted: totalDeleted }
+  });
+};
 var listTrashNotes = async (c) => {
   const uid = Number(c.get("uid"));
   const notes2 = await db.select().from(notes).where(and4(eq5(notes.user_id, uid), eq5(notes.is_deleted, 1))).orderBy(desc2(notes.deleted_at)).limit(200).all();
@@ -11594,9 +11654,111 @@ var importZip = async (c) => {
   }
 };
 
-// backend/api/file.ts
+// backend/api/export.ts
+var import_adm_zip2 = __toESM(require_adm_zip(), 1);
 import { join as join5 } from "path";
-import { existsSync as existsSync3, mkdirSync as mkdirSync3 } from "fs";
+import { mkdirSync as mkdirSync3, writeFileSync, rmSync as rmSync2, utimesSync } from "fs";
+import { eq as eq7, and as and6, inArray as inArray3 } from "drizzle-orm";
+function sanitizeFilename(name) {
+  return name.replace(/[\\/:*?"<>|]/g, "_");
+}
+function truncateFilename(name, maxLength = 200) {
+  if (name.length <= maxLength)
+    return name;
+  return name.slice(0, maxLength);
+}
+async function getAllChildNotebookIds(parentId) {
+  const children = await db.select({ id: notebooks.id }).from(notebooks).where(eq7(notebooks.parent_id, parentId));
+  let ids = children.map((c) => c.id);
+  for (const child of children) {
+    const childIds = await getAllChildNotebookIds(child.id);
+    ids = ids.concat(childIds);
+  }
+  return ids;
+}
+function buildNotebookPath(notebookId, notebookMap) {
+  const nb = notebookMap.get(notebookId);
+  if (!nb)
+    return "";
+  if (!nb.parent_id || !notebookMap.has(nb.parent_id)) {
+    return sanitizeFilename(nb.title);
+  }
+  const parentPath = buildNotebookPath(nb.parent_id, notebookMap);
+  return join5(parentPath, sanitizeFilename(nb.title));
+}
+var exportZip = async (c) => {
+  const uid = Number(c.get("uid"));
+  const notebookId = Number(c.req.query("notebook_id"));
+  if (!notebookId || isNaN(notebookId)) {
+    return c.json({ code: -1000, msg: "export.notebook_required", data: null });
+  }
+  const owned = await checkNotebookOwnership(notebookId, uid);
+  if (!owned) {
+    return c.json({ code: -1000, msg: "export.notebook_not_found", data: null });
+  }
+  const rootNotebook = await db.select().from(notebooks).where(eq7(notebooks.id, notebookId)).get();
+  if (!rootNotebook) {
+    return c.json({ code: -1000, msg: "export.notebook_not_found", data: null });
+  }
+  const allNotebookIds = [notebookId, ...await getAllChildNotebookIds(notebookId)];
+  const notes2 = await db.select({
+    id: notes.id,
+    notebook_id: notes.notebook_id,
+    title: notes.title,
+    content: notes.content,
+    created_at: notes.created_at,
+    updated_at: notes.updated_at
+  }).from(notes).where(and6(inArray3(notes.notebook_id, allNotebookIds), eq7(notes.is_deleted, 0)));
+  if (notes2.length === 0) {
+    return c.json({ code: -1000, msg: "export.no_notes", data: null });
+  }
+  if (notes2.length > 1000) {
+    return c.json({ code: -1000, msg: "export.too_many_notes", data: null });
+  }
+  const allNotebooks = await db.select({
+    id: notebooks.id,
+    parent_id: notebooks.parent_id,
+    title: notebooks.title
+  }).from(notebooks).where(inArray3(notebooks.id, allNotebookIds));
+  const notebookMap = new Map(allNotebooks.map((nb) => [nb.id, nb]));
+  const tmpDir = join5("/tmp", `zest_export_${uid}_${Date.now()}`);
+  const rootDir = join5(tmpDir, sanitizeFilename(rootNotebook.title));
+  mkdirSync3(rootDir, { recursive: true });
+  try {
+    const createdFiles = new Map;
+    for (const note of notes2) {
+      const notebookPath = buildNotebookPath(note.notebook_id, notebookMap);
+      const fullDirPath = join5(tmpDir, notebookPath);
+      mkdirSync3(fullDirPath, { recursive: true });
+      let baseName = truncateFilename(sanitizeFilename(note.title));
+      let fileName = `${baseName}.md`;
+      let filePath = join5(fullDirPath, fileName);
+      if (createdFiles.has(filePath)) {
+        fileName = `${baseName}_${randomString(3)}.md`;
+        filePath = join5(fullDirPath, fileName);
+      }
+      createdFiles.set(filePath, 1);
+      writeFileSync(filePath, note.content, "utf-8");
+      const createdAt = new Date(note.created_at);
+      const updatedAt = new Date(note.updated_at);
+      utimesSync(filePath, createdAt, updatedAt);
+    }
+    const zip = new import_adm_zip2.default;
+    zip.addLocalFolder(tmpDir);
+    const zipBuffer = zip.toBuffer();
+    c.header("Content-Type", "application/zip");
+    c.header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(rootNotebook.title)}.zip`);
+    return c.body(zipBuffer);
+  } finally {
+    try {
+      rmSync2(tmpDir, { recursive: true, force: true });
+    } catch {}
+  }
+};
+
+// backend/api/file.ts
+import { join as join6 } from "path";
+import { existsSync as existsSync3, mkdirSync as mkdirSync4 } from "fs";
 var uploadFiles = async (c) => {
   const uid = Number(c.get("uid"));
   const formData = await c.req.formData();
@@ -11621,11 +11783,11 @@ var uploadFiles = async (c) => {
     const now = new Date;
     const year = String(now.getFullYear());
     const month = String(now.getMonth() + 1).padStart(2, "0");
-    const relativePath = join5("images", String(uid), year, month, `${fileId}.${ext}`);
-    const fullPath = join5(FILES_BASE_PATH, relativePath);
+    const relativePath = join6("images", String(uid), year, month, `${fileId}.${ext}`);
+    const fullPath = join6(FILES_BASE_PATH, relativePath);
     const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
     if (!existsSync3(dir)) {
-      mkdirSync3(dir, { recursive: true });
+      mkdirSync4(dir, { recursive: true });
     }
     await Bun.write(fullPath, item);
     await db.insert(files).values({
@@ -11705,12 +11867,12 @@ var searchNotes = async (c) => {
 };
 
 // backend/api/doc.ts
-import { and as and6, asc as asc2, desc as desc4, eq as eq7, inArray as inArray3, isNull as isNull2, ne } from "drizzle-orm";
+import { and as and7, asc as asc2, desc as desc4, eq as eq8, inArray as inArray4, isNull as isNull2, ne } from "drizzle-orm";
 var collectSubtreeIds = async (rootId) => {
   const ids = new Set([rootId]);
   let current = [rootId];
   while (current.length > 0) {
-    const children = await db.select({ id: notebooks.id }).from(notebooks).where(inArray3(notebooks.parent_id, current)).all();
+    const children = await db.select({ id: notebooks.id }).from(notebooks).where(inArray4(notebooks.parent_id, current)).all();
     current = [];
     for (const c of children) {
       if (!ids.has(c.id)) {
@@ -11729,7 +11891,7 @@ var getAllTopLevelNotebooks = async (c) => {
     user_id: notebooks.user_id,
     username: users.username,
     sort_order: notebooks.sort_order
-  }).from(notebooks).leftJoin(users, eq7(notebooks.user_id, users.id)).where(isNull2(notebooks.parent_id)).orderBy(asc2(notebooks.sort_order)).all();
+  }).from(notebooks).leftJoin(users, eq8(notebooks.user_id, users.id)).where(isNull2(notebooks.parent_id)).orderBy(asc2(notebooks.sort_order)).all();
   return c.json({
     code: 200,
     msg: "doc.notebook.top.success",
@@ -11749,7 +11911,7 @@ var listDocs = async (c) => {
     updated_at: docs.updated_at,
     notebook_title: notebooks.title,
     notebook_description: notebooks.description
-  }).from(docs).leftJoin(notebooks, eq7(docs.notebook_id, notebooks.id)).orderBy(desc4(docs.id)).all();
+  }).from(docs).leftJoin(notebooks, eq8(docs.notebook_id, notebooks.id)).orderBy(desc4(docs.id)).all();
   return c.json({
     code: 200,
     msg: "doc.list.success",
@@ -11762,14 +11924,14 @@ var createDoc = async (c) => {
   if (!notebook_id || typeof notebook_id !== "number") {
     return c.json({ code: -1000, msg: "doc.create.notebook_required", data: null });
   }
-  const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq7(notebooks.id, notebook_id)).get();
+  const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq8(notebooks.id, notebook_id)).get();
   if (!notebook) {
     return c.json({ code: -1000, msg: "doc.create.notebook_not_found", data: null });
   }
   if (notebook.parent_id !== null) {
     return c.json({ code: -1000, msg: "doc.create.notebook_not_top_level", data: null });
   }
-  const existingDocByNotebook = await db.select({ id: docs.id }).from(docs).where(eq7(docs.notebook_id, notebook_id)).get();
+  const existingDocByNotebook = await db.select({ id: docs.id }).from(docs).where(eq8(docs.notebook_id, notebook_id)).get();
   if (existingDocByNotebook) {
     return c.json({ code: -1000, msg: "doc.create.notebook_already_published", data: null });
   }
@@ -11780,7 +11942,7 @@ var createDoc = async (c) => {
   if (!vSlug(trimmedSlug)) {
     return c.json({ code: -1000, msg: "doc.create.slug_invalid", data: null });
   }
-  const existingDocBySlug = await db.select({ id: docs.id }).from(docs).where(eq7(docs.slug, trimmedSlug)).get();
+  const existingDocBySlug = await db.select({ id: docs.id }).from(docs).where(eq8(docs.slug, trimmedSlug)).get();
   if (existingDocBySlug) {
     return c.json({ code: -1000, msg: "doc.create.slug_exists", data: null });
   }
@@ -11810,19 +11972,19 @@ var updateDoc = async (c) => {
   if (!id || typeof id !== "number") {
     return c.json({ code: -1000, msg: "doc.update.id_required", data: null });
   }
-  const existingDoc = await db.select().from(docs).where(eq7(docs.id, id)).get();
+  const existingDoc = await db.select().from(docs).where(eq8(docs.id, id)).get();
   if (!existingDoc) {
     return c.json({ code: -1000, msg: "doc.update.not_found", data: null });
   }
   if (notebook_id !== undefined) {
-    const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq7(notebooks.id, notebook_id)).get();
+    const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq8(notebooks.id, notebook_id)).get();
     if (!notebook) {
       return c.json({ code: -1000, msg: "doc.update.notebook_not_found", data: null });
     }
     if (notebook.parent_id !== null) {
       return c.json({ code: -1000, msg: "doc.update.notebook_not_top_level", data: null });
     }
-    const conflict = await db.select({ id: docs.id }).from(docs).where(and6(eq7(docs.notebook_id, notebook_id), ne(docs.id, id))).get();
+    const conflict = await db.select({ id: docs.id }).from(docs).where(and7(eq8(docs.notebook_id, notebook_id), ne(docs.id, id))).get();
     if (conflict) {
       return c.json({ code: -1000, msg: "doc.update.notebook_already_published", data: null });
     }
@@ -11836,7 +11998,7 @@ var updateDoc = async (c) => {
     if (!vSlug(trimmedSlug)) {
       return c.json({ code: -1000, msg: "doc.update.slug_invalid", data: null });
     }
-    const conflict = await db.select({ id: docs.id }).from(docs).where(and6(eq7(docs.slug, trimmedSlug), ne(docs.id, id))).get();
+    const conflict = await db.select({ id: docs.id }).from(docs).where(and7(eq8(docs.slug, trimmedSlug), ne(docs.id, id))).get();
     if (conflict) {
       return c.json({ code: -1000, msg: "doc.update.slug_exists", data: null });
     }
@@ -11857,7 +12019,7 @@ var updateDoc = async (c) => {
     updates.keywords = keywords;
   if (status !== undefined)
     updates.status = status;
-  const result = await db.update(docs).set(updates).where(eq7(docs.id, id)).returning().get();
+  const result = await db.update(docs).set(updates).where(eq8(docs.id, id)).returning().get();
   return c.json({
     code: 200,
     msg: "doc.update.success",
@@ -11875,11 +12037,11 @@ var deleteDoc = async (c) => {
       return c.json({ code: -1000, msg: "doc.delete.id_invalid", data: null });
     }
   }
-  const existingIds = await db.select({ id: docs.id }).from(docs).where(inArray3(docs.id, ids)).all();
+  const existingIds = await db.select({ id: docs.id }).from(docs).where(inArray4(docs.id, ids)).all();
   if (existingIds.length !== ids.length) {
     return c.json({ code: -1000, msg: "doc.delete.not_found", data: null });
   }
-  await db.delete(docs).where(inArray3(docs.id, ids)).run();
+  await db.delete(docs).where(inArray4(docs.id, ids)).run();
   return c.json({
     code: 200,
     msg: "doc.delete.success",
@@ -11888,11 +12050,11 @@ var deleteDoc = async (c) => {
 };
 var getPublicDoc = async (c) => {
   const slug = c.req.param("slug");
-  const doc = await db.select().from(docs).where(eq7(docs.slug, slug)).get();
+  const doc = await db.select().from(docs).where(eq8(docs.slug, slug)).get();
   if (!doc || doc.status !== "active") {
     return c.json({ code: -1000, msg: "doc.public.not_found", data: null });
   }
-  const rootNotebook = await db.select({ title: notebooks.title, description: notebooks.description }).from(notebooks).where(eq7(notebooks.id, doc.notebook_id)).get();
+  const rootNotebook = await db.select({ title: notebooks.title, description: notebooks.description }).from(notebooks).where(eq8(notebooks.id, doc.notebook_id)).get();
   const notebookIds = await collectSubtreeIds(doc.notebook_id);
   const idList = [...notebookIds];
   const notebooks2 = await db.select({
@@ -11900,7 +12062,7 @@ var getPublicDoc = async (c) => {
     parent_id: notebooks.parent_id,
     title: notebooks.title,
     sort_order: notebooks.sort_order
-  }).from(notebooks).where(inArray3(notebooks.id, idList)).orderBy(asc2(notebooks.sort_order)).all();
+  }).from(notebooks).where(inArray4(notebooks.id, idList)).orderBy(asc2(notebooks.sort_order)).all();
   const notes2 = await db.select({
     id: notes.id,
     notebook_id: notes.notebook_id,
@@ -11909,7 +12071,7 @@ var getPublicDoc = async (c) => {
     sort_order: notes.sort_order,
     created_at: notes.created_at,
     updated_at: notes.updated_at
-  }).from(notes).where(and6(inArray3(notes.notebook_id, idList), eq7(notes.is_deleted, 0))).orderBy(desc4(notes.is_pinned), asc2(notes.sort_order), desc4(notes.created_at)).all();
+  }).from(notes).where(and7(inArray4(notes.notebook_id, idList), eq8(notes.is_deleted, 0))).orderBy(desc4(notes.is_pinned), asc2(notes.sort_order), desc4(notes.created_at)).all();
   const nodeMap = new Map;
   for (const nb of notebooks2) {
     nodeMap.set(nb.id, {
@@ -11953,11 +12115,11 @@ var getPublicNote = async (c) => {
   if (!noteId || isNaN(noteId)) {
     return c.json({ code: -1000, msg: "doc.note.id_required", data: null });
   }
-  const doc = await db.select().from(docs).where(eq7(docs.slug, slug)).get();
+  const doc = await db.select().from(docs).where(eq8(docs.slug, slug)).get();
   if (!doc || doc.status !== "active") {
     return c.json({ code: -1000, msg: "doc.note.not_found", data: null });
   }
-  const note = await db.select().from(notes).where(and6(eq7(notes.id, noteId), eq7(notes.is_deleted, 0))).get();
+  const note = await db.select().from(notes).where(and7(eq8(notes.id, noteId), eq8(notes.is_deleted, 0))).get();
   if (!note) {
     return c.json({ code: -1000, msg: "doc.note.not_found", data: null });
   }
@@ -11979,18 +12141,18 @@ var getPublicNote = async (c) => {
 };
 
 // backend/middleware/auth.ts
-import { and as and7, eq as eq8 } from "drizzle-orm";
+import { and as and8, eq as eq9 } from "drizzle-orm";
 var verifyApiToken = async (token, c, role = "user") => {
   if (!token || token.length < 32) {
     return false;
   }
   try {
-    const session = await db.select().from(sessions).where(and7(eq8(sessions.token, token), eq8(sessions.status, "active"))).get();
+    const session = await db.select().from(sessions).where(and8(eq9(sessions.token, token), eq9(sessions.status, "active"))).get();
     if (!session) {
       return false;
     }
     if (session.expires_at.getTime() <= Date.now()) {
-      await db.update(sessions).set({ status: "expired" }).where(eq8(sessions.id, session.id)).run();
+      await db.update(sessions).set({ status: "expired" }).where(eq9(sessions.id, session.id)).run();
       return false;
     }
     if (role === "admin" && session.role !== "admin") {
@@ -11999,7 +12161,7 @@ var verifyApiToken = async (token, c, role = "user") => {
     const user = await db.select({
       id: users.id,
       username: users.username
-    }).from(users).where(and7(eq8(users.id, session.uid), eq8(users.status, "active"))).get();
+    }).from(users).where(and8(eq9(users.id, session.uid), eq9(users.status, "active"))).get();
     if (!user) {
       return false;
     }
@@ -12077,8 +12239,10 @@ userRouter.get("/note/versions", listNoteVersions);
 userRouter.get("/note/version", getNoteVersion);
 userRouter.get("/note/detail", getNoteById);
 userRouter.get("/note/trash", listTrashNotes);
+userRouter.post("/note/trash/empty", emptyTrash);
 userRouter.post("/note/permanent_delete", permanentDeleteNote);
 userRouter.post("/import", importZip);
+userRouter.get("/export", exportZip);
 userRouter.post("/file/upload", uploadFiles);
 adminRouter.get("/app_info", getAppInfo);
 adminRouter.get("/list_users", listUsers);
