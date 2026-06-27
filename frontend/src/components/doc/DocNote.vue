@@ -152,7 +152,7 @@ const handleContentClick = (e: MouseEvent) => {
     <template v-else-if="note">
       <!-- 笔记标题 + 元信息：底部细线分隔 -->
       <div class="mb-6 border-b border-slate-100 pb-4">
-        <h1 class="mb-1.5 text-2xl font-bold tracking-tight text-slate-900">{{ note.title }}</h1>
+        <h1 class="mb-1.5 text-[1.75rem] font-bold tracking-tight text-slate-900">{{ note.title }}</h1>
         <!-- 元信息 -->
         <div class="flex items-center gap-3 text-xs text-slate-400">
           <span v-if="note.updated_at" class="inline-flex items-center gap-1">

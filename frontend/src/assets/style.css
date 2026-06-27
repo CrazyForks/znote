@@ -55,6 +55,9 @@
     padding:0 36px 24px 36px !important;
     background-color: #FAFBFC !important;
 }
+.vditor-reset strong{
+    font-weight: 600 !important;    
+}
 .vditor{
     border-left-width: 0px !important;
     border-right-width: 0px !important;
