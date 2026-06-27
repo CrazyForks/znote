@@ -13,21 +13,33 @@ export interface FlattenSection {
     notes: any[];
     /** 层级深度（用于缩进） */
     depth: number;
+    /** 当前分类是否有子分类（用于决定 notes 是否需要额外缩进以与子分类对齐） */
+    hasChildren: boolean;
 }
 
 /**
  * 递归平铺分类树：按分类分组输出笔记列表，depth 记录层级深度用于缩进
+ * 当分类无 notes（仅含子分类）时，子分类继承当前 depth，避免空分类"穿透"贡献层级
  * @param tree 分类树（完整或子树）
  */
 export function useFlattenDocTree(tree: Ref<any[]>) {
     const flatten = (nodes: any[], depth = 0): FlattenSection[] => {
         const result: FlattenSection[] = [];
         for (const node of nodes) {
+            const hasChildren = !!(node.children && node.children.length > 0);
             if (node.notes && node.notes.length > 0) {
-                result.push({ category: node, notes: node.notes, depth });
+                result.push({
+                    category: node,
+                    notes: node.notes,
+                    depth,
+                    hasChildren,
+                });
             }
-            if (node.children && node.children.length > 0) {
-                result.push(...flatten(node.children, depth + 1));
+            if (hasChildren) {
+                // 当前分类无笔记（被跳过）→ 子分类继承当前 depth；否则 depth + 1
+                const hasNotes = node.notes && node.notes.length > 0;
+                const childDepth = hasNotes ? depth + 1 : depth;
+                result.push(...flatten(node.children, childDepth));
             }
         }
         return result;

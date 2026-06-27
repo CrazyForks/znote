@@ -86,6 +86,7 @@ const goToNote = (noteId: number) => {
         <div
           v-for="note in section.notes"
           :key="note.id"
+          :style="section.hasChildren ? { paddingLeft: '20px' } : {}"
           class="group flex cursor-pointer items-center rounded-lg px-3 py-2 transition hover:bg-slate-50"
           @click="goToNote(note.id)"
         >
