@@ -213,11 +213,25 @@ watch(activeNoteId, (newId) => {
       <Transition name="drawer-slide">
         <div
           v-if="sidebarOpen"
-          class="fixed inset-0 z-30 pt-12 lg:hidden"
+          class="fixed inset-0 z-30 lg:hidden"
         >
           <div class="absolute inset-0 bg-black/30" @click="sidebarOpen = false" />
-          <div class="relative z-40 h-full w-[300px] max-w-[85vw]">
-            <DocSidebar />
+          <div class="relative z-40 flex h-full w-[300px] max-w-[85vw] flex-col bg-white shadow-xl">
+            <!-- 抽屉头部：关闭按钮 + 文档标题 -->
+            <div class="flex h-12 flex-shrink-0 items-center justify-between border-b border-slate-200 px-4">
+              <button
+                class="-ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+                @click="sidebarOpen = false"
+              >
+                <ZIcon name="ri:close-line" :size="18" />
+              </button>
+              <span class="truncate text-sm font-semibold text-slate-800">{{ displayTitle }}</span>
+              <div class="w-8" />
+            </div>
+            <!-- 侧栏内容（填满抽屉剩余高度） -->
+            <div class="flex-1 min-h-0">
+              <DocSidebar />
+            </div>
           </div>
         </div>
       </Transition>
