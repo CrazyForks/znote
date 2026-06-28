@@ -215,7 +215,7 @@ const handleClose = () => {
         <button
           v-if="!createdShare"
           class="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="(!!password.value && passwordInvalid) || submitting"
+          :disabled="(!!password && passwordInvalid) || submitting"
           @click="handleCreate"
         >
           {{ t("note.share.create") }}

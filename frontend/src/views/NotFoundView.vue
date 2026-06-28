@@ -8,32 +8,27 @@ const router = useRouter();
 </script>
 
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 text-slate-100">
-    <!-- 背景渐变光晕 -->
-    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
-      <div class="absolute -top-32 -left-24 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl" />
-      <div class="absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl" />
-    </div>
-
-    <div class="relative z-10 px-4 text-center">
+  <div
+    class="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500"
+    style="background-image: radial-gradient(ellipse at top, rgba(59,130,246,0.04), transparent 60%);"
+  >
+    <div class="px-4 text-center">
       <!-- 404 数字 -->
-      <h1
-        class="bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-8xl font-bold tracking-tighter text-transparent sm:text-9xl"
-      >
+      <h1 class="text-8xl font-bold tracking-tighter text-blue-200 sm:text-9xl">
         {{ t("notfound.title") }}
       </h1>
 
       <!-- 提示文案 -->
-      <p class="mt-4 text-base text-slate-400 sm:mt-6 sm:text-lg">
+      <p class="mt-4 text-sm text-slate-400 sm:mt-6 sm:text-base">
         {{ t("notfound.description") }}
       </p>
 
       <!-- 返回首页按钮 -->
       <button
-        class="btn-base btn-primary btn-lg mt-8 sm:mt-10"
+        class="btn-base btn-lg mt-8 sm:mt-10"
         @click="router.push('/')"
       >
-        <ZIcon name="ri:home-5-line" :size="18" color="currentColor" />
+        <ZIcon name="ri:home-5-line" :size="18" class="opacity-70" />
         <span>{{ t("notfound.back_home") }}</span>
       </button>
     </div>
@@ -44,20 +39,14 @@ const router = useRouter();
 @reference "tailwindcss";
 
 .btn-base {
-  @apply inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium rounded-xl transition-all duration-200 select-none;
+  @apply inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium rounded-xl transition-all duration-200 select-none
+         bg-white border border-slate-200 text-slate-600
+         hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50
+         focus:outline-none focus:ring-1 focus:ring-blue-100;
 }
 
 .btn-lg {
-  @apply h-12 px-7 text-base;
-}
-
-.btn-primary {
-  @apply text-white bg-gradient-to-r from-blue-500 to-cyan-400
-         shadow-lg shadow-blue-500/30
-         hover:shadow-xl hover:shadow-blue-500/50
-         hover:from-blue-400 hover:to-cyan-300
-         hover:-translate-y-0.5
-         active:translate-y-0;
+  @apply h-10 px-5 text-sm;
 }
 
 @media (prefers-reduced-motion: reduce) {
