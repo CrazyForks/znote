@@ -389,6 +389,20 @@ export const useNoteStore = defineStore("note", {
                         this.activeNoteId = savedNoteId;
                     }
                 }
+
+                // 如果没有缓存的分类，自动选择当前笔记本的第一个分类
+                if (this.activeCategoryId === null && this.activeNotebookId !== null) {
+                    const notebook = this.notebookTree.find(n => n.id === this.activeNotebookId);
+                    if (notebook && notebook.children.length > 0) {
+                        const firstCategory = notebook.children[0];
+                        this.activeCategoryId = firstCategory.id;
+                        writeSessionId(SESSION_KEYS.category, firstCategory.id);
+                        // 按需加载该分类的笔记
+                        if (!this.loadedCategoryIds.has(firstCategory.id)) {
+                            await this.loadCategoryNotes(firstCategory.id);
+                        }
+                    }
+                }
             } finally {
                 this.loading.tree = false;
             }
@@ -398,19 +412,35 @@ export const useNoteStore = defineStore("note", {
 
         /**
          * 切换顶层笔记本
-         * 切换后重置分类选中状态，清空搜索态和回收站模式，同步写入 sessionStorage
+         * 切换后自动选中该笔记本下的第一个分类，清空搜索态和回收站模式，同步写入 sessionStorage
          */
         switchNotebook(id: number) {
             this.activeNotebookId = id;
-            this.activeCategoryId = null;
-            this.activeNoteId = null;
             this.searchMode = false;
             this.searchKeyword = "";
             this.searchResults = [];
             if (this.trashMode) this.exitTrashMode();
             writeLocalId(SESSION_KEYS.notebook, id);
-            writeSessionId(SESSION_KEYS.category, null);
-            writeSessionId(SESSION_KEYS.note, null);
+
+            // 自动选择该笔记本下的第一个分类
+            const notebook = this.notebookTree.find(n => n.id === id);
+            if (notebook && notebook.children.length > 0) {
+                const firstCategory = notebook.children[0];
+                this.activeCategoryId = firstCategory.id;
+                this.activeNoteId = null;
+                writeSessionId(SESSION_KEYS.category, firstCategory.id);
+                writeSessionId(SESSION_KEYS.note, null);
+                // 按需加载该分类的笔记
+                if (!this.loadedCategoryIds.has(firstCategory.id)) {
+                    this.loadCategoryNotes(firstCategory.id);
+                }
+            } else {
+                // 没有子分类时，清空选中
+                this.activeCategoryId = null;
+                this.activeNoteId = null;
+                writeSessionId(SESSION_KEYS.category, null);
+                writeSessionId(SESSION_KEYS.note, null);
+            }
         },
 
         /**
