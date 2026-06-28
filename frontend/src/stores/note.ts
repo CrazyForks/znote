@@ -12,7 +12,8 @@ import { defineStore } from "pinia";
 import * as notebookApi from "@/api/notebook";
 import * as noteApi from "@/api/note";
 import { fetchNoteById, fetchTrashNotes, permanentDeleteNote, emptyTrash as apiEmptyTrash } from "@/api/note";
-import type { CreateNotebookPayload, CreateNotePayload, Note, Notebook, NotebookNode, SortNoteItem, SortNotebookItem } from "@/types/note";
+import { fetchMyShares } from "@/api/share";
+import type { CreateNotebookPayload, CreateNotePayload, Note, Notebook, NotebookNode, SortNoteItem, SortNotebookItem, ShareItem } from "@/types/note";
 
 interface LoadingState {
     tree: boolean;     // 笔记本树加载中
@@ -21,6 +22,7 @@ interface LoadingState {
     search: boolean;   // 全文搜索中
     noteDetail: boolean; // 单条笔记详情加载中
     trash: boolean;    // 回收站列表加载中
+    shares: boolean;   // 分享列表加载中
 }
 
 /** sessionStorage 存储 key 常量 */
@@ -239,6 +241,10 @@ export const useNoteStore = defineStore("note", {
         trashMode: false,
         /** 回收站笔记列表（最近删除，最多 200 条） */
         trashNotes: [] as Note[],
+        /** 是否处于分享管理模式 */
+        sharesMode: false,
+        /** 我的分享列表（最多 100 条） */
+        myShares: [] as ShareItem[],
         /** 加载状态 */
         loading: {
             tree: false,
@@ -247,6 +253,7 @@ export const useNoteStore = defineStore("note", {
             search: false,
             noteDetail: false,
             trash: false,
+            shares: false,
         } as LoadingState,
     }),
 
@@ -385,6 +392,8 @@ export const useNoteStore = defineStore("note", {
             } finally {
                 this.loading.tree = false;
             }
+            // 静默预加载分享数量（只填充 myShares，不改 sharesMode）
+            fetchMyShares().then((list) => { this.myShares = list; }).catch(() => {});
         },
 
         /**
@@ -410,6 +419,7 @@ export const useNoteStore = defineStore("note", {
          */
         async selectCategory(id: number | null) {
             if (this.trashMode) this.exitTrashMode();
+            if (this.sharesMode) this.exitSharesMode();
             this.activeCategoryId = id;
             this.activeNoteId = null;
             writeSessionId(SESSION_KEYS.category, id);
@@ -667,7 +677,8 @@ export const useNoteStore = defineStore("note", {
                             this.searchMode = false;
                             this.searchKeyword = "";
                             this.searchResults = [];
-                            if (this.trashMode) this.exitTrashMode();
+if (this.trashMode) this.exitTrashMode();
+            if (this.sharesMode) this.exitSharesMode();
                             writeLocalId(SESSION_KEYS.notebook, null);
                             writeSessionId(SESSION_KEYS.category, null);
                             writeSessionId(SESSION_KEYS.note, null);
@@ -892,6 +903,7 @@ export const useNoteStore = defineStore("note", {
          * 清空分类/笔记选中，请求回收站列表，切换 trashMode
          */
         async enterTrashMode() {
+            if (this.sharesMode) this.exitSharesMode();
             this.activeCategoryId = null;
             this.activeNoteId = null;
             writeSessionId(SESSION_KEYS.category, null);
@@ -912,6 +924,33 @@ export const useNoteStore = defineStore("note", {
         exitTrashMode() {
             this.trashMode = false;
             this.trashNotes = [];
+        },
+
+        /**
+         * 进入我的分享模式
+         * 清空分类/笔记选中，请求分享列表，切换 sharesMode
+         */
+        async enterSharesMode() {
+            if (this.trashMode) this.exitTrashMode();
+            this.activeCategoryId = null;
+            this.activeNoteId = null;
+            writeSessionId(SESSION_KEYS.category, null);
+            writeSessionId(SESSION_KEYS.note, null);
+            this.sharesMode = true;
+            this.loading.shares = true;
+            try {
+                this.myShares = await fetchMyShares();
+            } finally {
+                this.loading.shares = false;
+            }
+        },
+
+        /**
+         * 退出我的分享模式
+         */
+        exitSharesMode() {
+            this.sharesMode = false;
+            this.myShares = [];
         },
 
         // ==================== 静默刷新（tab 后台轮询用） ====================

@@ -20,6 +20,7 @@ import {
 } from "@/api/user";
 import { listNotebooks, getTopLevelNotebooks, createNotebook, updateNotebook, sortNotebooks, deleteNotebooks } from "@/api/notebook";
 import { listNotes, createNote, updateNote, deleteNote, sortNotes, getNoteById, listTrashNotes, permanentDeleteNote, emptyTrash } from "@/api/note";
+import { createShare, listShares, getShare, deleteShare } from "@/api/share";
 import { listNoteVersions, getNoteVersion } from "@/api/note_version";
 import { importZip } from "@/api/import";
 import { exportZip } from "@/api/export";
@@ -77,9 +78,12 @@ publicRouter.get("/app", index);
 publicRouter.get("/app/*", index);
 publicRouter.get("/doc", index);
 publicRouter.get("/doc/*", index);
+publicRouter.get("/s", index);
+publicRouter.get("/s/*", index);
 
 publicRouter.get("/api/doc/:slug", getPublicDoc);
 publicRouter.get("/api/doc/:slug/note/:noteId", getPublicNote);
+publicRouter.get("/api/share/:shareId", getShare);
 publicRouter.get("/api/system/status", getSystemStatus);
 publicRouter.post("/api/init_user", initUser);
 publicRouter.post("/api/login", login);
@@ -106,6 +110,9 @@ userRouter.post("/notebook/note/create", createNote);
 userRouter.post("/notebook/note/update", updateNote);
 userRouter.post("/notebook/note/delete", deleteNote);
 userRouter.post("/notebook/note/sort", sortNotes);
+userRouter.post("/note/share/create", createShare);
+userRouter.get("/note/share/list", listShares);
+userRouter.post("/note/share/delete", deleteShare);
 
 userRouter.get("/note/versions", listNoteVersions);
 userRouter.get("/note/version", getNoteVersion);

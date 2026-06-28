@@ -77,4 +77,4 @@ docker run -d \
 ## 联系我们
 
 - Blog：[https://blog.xiaoz.org/](https://blog.xiaoz.org/)
-- X：[https://x.com/xiaozorg](https://x.com/xiaozorg)
+- X：[https://x.com/xiaozblog](https://x.com/xiaozblog)

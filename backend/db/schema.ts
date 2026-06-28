@@ -104,6 +104,30 @@ export const noteVersions = sqliteTable("note_versions", {
 ]);
 
 
+// ==================== 笔记分享 ====================
+
+/**
+ * 笔记分享表
+ * 每篇笔记可创建多个分享链接，支持可选密码和有效期
+ * share_id 为业务唯一标识（随机字符串），用于公开访问 /s/{share_id}
+ */
+export const noteShares = sqliteTable("note_shares", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    note_id: integer("note_id").notNull(),                                          // 关联笔记
+    user_id: integer("user_id").notNull(),                                          // 所属用户（冗余，方便查询）
+    share_id: text("share_id").notNull().unique(),                                  // 业务唯一标识，如 "aB3xK9mQ"
+    password: text("password"),                                                      // 分享密码，NULL 表示无密码（明文存储）
+    expires_at: integer("expires_at", { mode: "timestamp" }),                       // 过期时间，NULL 表示永不过期
+    status: text("status", { enum: ["active", "revoked"] }).default("active").notNull(), // active 可访问，revoked 已撤销
+    created_at: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+    updated_at: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+}, (table) => [
+    index("idx_note_shares_note").on(table.note_id),                                // 按笔记查分享列表
+    index("idx_note_shares_user").on(table.user_id),                                // 按用户查所有分享
+    index("idx_note_shares_share_id").on(table.share_id),                           // 按 share_id 快速查找
+]);
+
+
 // ==================== 文件管理 ====================
 
 /**

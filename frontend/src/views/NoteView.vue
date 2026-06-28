@@ -18,6 +18,7 @@ import UserHeader from "@/components/note/UserHeader.vue";
 import NotebookSwitcher from "@/components/note/NotebookSwitcher.vue";
 import CategoryTree from "@/components/note/CategoryTree.vue";
 import NoteList from "@/components/note/NoteList.vue";
+import ShareList from "@/components/note/ShareList.vue";
 import NoteEditor from "@/components/note/NoteEditor.vue";
 import NoteMetaBar from "@/components/note/NoteMetaBar.vue";
 import CreateNotebookDialog from "@/components/note/dialogs/CreateNotebookDialog.vue";
@@ -575,6 +576,12 @@ const handleEnterTrash = async () => {
     if (isMobile.value) drawerOpen.value = false;
 };
 
+/** 进入我的分享模式 */
+const handleEnterShares = async () => {
+    await noteStore.enterSharesMode();
+    if (isMobile.value) drawerOpen.value = false;
+};
+
 /**
  * 同步草稿状态
  * 监听 activeNote 而非 activeNoteId，避免 selectNote async 期间提前 flush 空白数据
@@ -719,8 +726,25 @@ const handleSaveTitle = async () => {
             @request-dialog="(pid: number, pname: string) => openCreateCategoryDialog(pid, pname)"
             @contextmenu="handleCategoryContextMenu"
           />
-          <!-- 回收站入口 -->
+          <!-- 我的分享入口 -->
           <div class="mt-2 border-t border-slate-700/60 pt-2">
+            <div class="flex items-center justify-between rounded px-2 py-1.5">
+              <div
+                class="flex cursor-pointer items-center gap-2 text-sm transition"
+                :class="noteStore.sharesMode ? 'text-blue-300' : 'text-slate-400 hover:text-slate-200'"
+                @click="handleEnterShares"
+              >
+                <ZIcon name="ri:share-forward-line" :size="16" color="currentColor" />
+                <span>{{ t('note.shares.title') }}</span>
+              </div>
+              <span
+                v-if="noteStore.myShares.length > 0"
+                class="inline-flex items-center rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300"
+              >{{ noteStore.myShares.length }}</span>
+            </div>
+          </div>
+          <!-- 回收站入口 -->
+          <div class="pt-2">
             <div class="flex items-center justify-between rounded px-2 py-1.5">
               <div
                 class="flex cursor-pointer items-center gap-2 text-sm transition"
@@ -756,12 +780,22 @@ const handleSaveTitle = async () => {
     <!-- 第一栏右侧拖拽把手 -->
     <div class="resize-handle" @mousedown="(e) => startResize(1, e)" />
 
-    <!-- ==================== 第二栏：笔记列表 ==================== -->
+    <!-- ==================== 第二栏：笔记列表 / 分享列表 ==================== -->
     <aside
       :style="{ width: col2Width + 'px' }"
       class="flex shrink-0 flex-col border-r border-slate-200/60 bg-white"
     >
+      <!-- 分享管理模式 -->
+      <ShareList
+        v-if="noteStore.sharesMode"
+        :shares="noteStore.myShares"
+        :loading="noteStore.loading.shares"
+        :is-mobile="isMobile"
+        @deleted="handleEnterShares"
+      />
+      <!-- 正常 / 回收站模式 -->
       <NoteList
+        v-else
         :notes="noteStore.displayedNotes"
         :active-id="noteStore.activeNoteId"
         :loading="noteListLoading"
@@ -778,8 +812,20 @@ const handleSaveTitle = async () => {
 
     <!-- ==================== 第三栏：编辑器 ==================== -->
     <main class="flex flex-1 flex-col overflow-hidden bg-white">
+      <!-- 分享模式：右侧占位提示 -->
+      <div v-if="noteStore.sharesMode" class="flex flex-1 items-center justify-center bg-white">
+        <div class="flex flex-col items-center gap-3 text-center">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+            <ZIcon name="ri:share-forward-line" :size="32" color="#94a3b8" />
+          </div>
+          <div>
+            <p class="text-sm text-slate-400">{{ t("note.shares.right_hint") }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 选中笔记时：编辑器 -->
-      <template v-if="noteStore.activeNote">
+      <template v-else-if="noteStore.activeNote">
         <!-- 顶部：可编辑标题 + 元信息 -->
         <div class="shrink-0 bg-white px-8 py-4">
           <input
@@ -1025,8 +1071,25 @@ const handleSaveTitle = async () => {
                 @request-dialog="(pid: number, pname: string) => openCreateCategoryDialog(pid, pname)"
                 @contextmenu="handleCategoryContextMenu"
               />
-              <!-- 回收站入口 -->
+              <!-- 我的分享入口 -->
               <div class="mt-2 border-t border-slate-700/60 pt-2">
+                <div class="flex items-center justify-between rounded px-2 py-1.5">
+                  <div
+                    class="flex cursor-pointer items-center gap-2 text-sm transition"
+                    :class="noteStore.sharesMode ? 'text-blue-300' : 'text-slate-400 hover:text-slate-200'"
+                    @click="handleEnterShares"
+                  >
+                    <ZIcon name="ri:share-forward-line" :size="16" color="currentColor" />
+                    <span>{{ t('note.shares.title') }}</span>
+                  </div>
+                  <span
+                    v-if="noteStore.myShares.length > 0"
+                    class="inline-flex items-center rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300"
+                  >{{ noteStore.myShares.length }}</span>
+                </div>
+              </div>
+              <!-- 回收站入口 -->
+              <div class="pt-2">
                 <div class="flex items-center justify-between rounded px-2 py-1.5">
                   <div
                     class="flex cursor-pointer items-center gap-2 text-sm transition"
@@ -1063,7 +1126,15 @@ const handleSaveTitle = async () => {
 
     <!-- 笔记列表视图（无选中笔记时） -->
     <div v-if="!hasActiveNote" class="flex flex-1 flex-col overflow-hidden">
+      <ShareList
+        v-if="noteStore.sharesMode"
+        :shares="noteStore.myShares"
+        :loading="noteStore.loading.shares"
+        :is-mobile="isMobile"
+        @deleted="handleEnterShares"
+      />
       <NoteList
+        v-else
         :notes="noteStore.displayedNotes"
         :active-id="noteStore.activeNoteId"
         :loading="noteListLoading"

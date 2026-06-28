@@ -23,6 +23,7 @@ import ZIcon from "@/components/DynamicIcon.vue";
 import NoteListItem from "@/components/note/NoteListItem.vue";
 import NoteContextMenu, { type NoteContextAction } from "@/components/note/NoteContextMenu.vue";
 import MoveDialog from "@/components/note/dialogs/MoveDialog.vue";
+import ShareDialog from "@/components/note/dialogs/ShareDialog.vue";
 import { useNoteStore } from "@/stores/note";
 import type { Note } from "@/types/note";
 
@@ -167,6 +168,15 @@ const showMoveDialog = ref(false);
 /** 被移动的笔记 */
 const moveNote = ref<Note | null>(null);
 
+// ==================== 分享弹窗状态 ====================
+
+/** 分享弹窗显隐 */
+const shareDialogShow = ref(false);
+/** 被分享的笔记 ID */
+const shareNoteId = ref(0);
+/** 被分享的笔记标题 */
+const shareNoteTitle = ref("");
+
 /** 当前笔记本下的分类树（用于移动对话框） */
 const currentCategoryTree = computed(() => {
     return noteStore.activeNotebook?.children ?? [];
@@ -203,6 +213,12 @@ const handleMenuSelect = async (action: NoteContextAction, note: Note) => {
     if (action === "move") {
         moveNote.value = note;
         showMoveDialog.value = true;
+        return;
+    }
+    if (action === "share") {
+        shareNoteId.value = note.id;
+        shareNoteTitle.value = note.title;
+        shareDialogShow.value = true;
         return;
     }
     // pin：智能切换置顶状态
@@ -360,6 +376,13 @@ const handleMoveCancel = () => {
       :current-category-id="noteStore.activeCategoryId ?? undefined"
       @confirm="handleMoveConfirm"
       @cancel="handleMoveCancel"
+    />
+
+    <!-- 创建分享弹窗 -->
+    <ShareDialog
+      v-model:show="shareDialogShow"
+      :note-id="shareNoteId"
+      :note-title="shareNoteTitle"
     />
   </div>
 </template>
