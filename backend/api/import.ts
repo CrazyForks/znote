@@ -1,4 +1,5 @@
 import { Context } from "hono";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { checkNotebookOwnership } from "@/utils/ownership";
@@ -14,6 +15,24 @@ interface NoteEntry {
     mtime: Date;
 }
 
+/** 自动生成的包装子分类名（纯扁平 zip 或混合场景兜底） */
+const WRAPPER_NAME = "Imported";
+/** 自动生成的包装子分类描述（英文） */
+const WRAPPER_DESC = "Auto-created from ZIP import";
+
+/**
+ * 自定义 zip 文件名解码器：
+ * 优先按 UTF-8 解码（fatal: true 会在遇到非法序列时抛错），
+ * 失败则回退 GBK（兼容中文 Windows 上常见的 zip 打包方式）。
+ */
+const decodeFileName = (buf: Buffer): string => {
+    try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    } catch {
+        return new TextDecoder("gbk").decode(buf);
+    }
+};
+
 /**
  * ZIP 导入接口
  * POST /api/user/import
@@ -21,11 +40,11 @@ interface NoteEntry {
  *
  * 流程：
  * 1. 校验 notebook_id 归属
- * 2. 解压 ZIP 到临时目录
- * 3. 剥离逻辑：唯一顶层目录且不含 .md → 剥离顶层
- * 4. 事务 #1：递归创建 notebooks（取文件 mtime 为时间戳），同时收集 notes 数据
- * 5. 事务 #2：批量 INSERT notes
- * 6. 清理临时文件，返回成功
+ * 2. 解压 ZIP 到临时目录（GBK/UTF-8 自适应文件名解码）
+ * 3. 剥离：唯一顶层目录 + 顶层 0 .md + 该目录直接不含 .md → 下沉
+ * 4. 包装：rootDir 直接含 .md → 在目标笔记本下建/复用 Imported 子分类
+ * 5. 单事务：递归创建 notebooks → 按 title 去重收集 notes → 批量 INSERT
+ * 6. 清理临时文件
  */
 export const importZip = async (c: Context) => {
     const uid = Number(c.get("uid"));
@@ -56,15 +75,31 @@ export const importZip = async (c: Context) => {
     mkdirSync(tmpDir, { recursive: true });
 
     try {
-        // 保存 ZIP 到临时目录并解压
+        // 保存 ZIP 到临时目录并解压（使用自定义 decoder 兼容 GBK 文件名）
         const zipPath = join(tmpDir, "import.zip");
         await Bun.write(zipPath, file);
 
-        const zip = new AdmZip(zipPath);
+        const zip = new AdmZip(zipPath, {
+            decoder: {
+                efs: true,                       // 写出时按 UTF-8（本接口只读，不影响解压）
+                decode: decodeFileName,          // 读时：UTF-8 失败回退 GBK
+                encode: (data: string) => Buffer.from(data, "utf8"),
+            },
+        });
         const extractDir = join(tmpDir, "extracted");
         zip.extractAllTo(extractDir, true);
 
-        // 剥离逻辑：扫描 extracted 顶层
+        // 工具：判断目录直接子项中是否有 .md
+        const hasMdDirectly = (dir: string): boolean =>
+            readdirSync(dir).some((name) => {
+                try {
+                    return name.endsWith(".md") && statSync(join(dir, name)).isFile();
+                } catch {
+                    return false;
+                }
+            });
+
+        // 剥离逻辑：仅当"唯一顶层目录"且"该目录直接不含 .md"时，才下沉
         const entries = readdirSync(extractDir);
         const topDirs = entries.filter((e) => {
             try { return statSync(join(extractDir, e)).isDirectory(); } catch { return false; }
@@ -75,17 +110,52 @@ export const importZip = async (c: Context) => {
 
         let rootDir = extractDir;
         if (topDirs.length === 1 && topMds.length === 0) {
-            rootDir = join(extractDir, topDirs[0]);
+            if (!hasMdDirectly(join(extractDir, topDirs[0]))) {
+                rootDir = join(extractDir, topDirs[0]);
+            }
         }
 
-        const noteEntries: NoteEntry[] = [];
-
-        // 事务 #1：递归创建 notebooks 并收集 notes 数据
+        // 单事务：所有写入原子提交
         await db.transaction(async (tx) => {
+            const pending: NoteEntry[] = [];
+
+            // 工具：复用或创建 Imported 包装子分类
+            const getOrCreateWrapper = async (parentDbId: number, fallbackMtime: Date): Promise<number> => {
+                const existing = await tx
+                    .select({ id: schema.notebooks.id })
+                    .from(schema.notebooks)
+                    .where(and(
+                        eq(schema.notebooks.user_id, uid),
+                        eq(schema.notebooks.parent_id, parentDbId),
+                        eq(schema.notebooks.title, WRAPPER_NAME),
+                    ))
+                    .get();
+                if (existing) return existing.id;
+                const [nb] = await tx
+                    .insert(schema.notebooks)
+                    .values({
+                        user_id: uid,
+                        parent_id: parentDbId,
+                        title: WRAPPER_NAME,
+                        description: WRAPPER_DESC,
+                        sort_order: 0,
+                        created_at: fallbackMtime,
+                        updated_at: fallbackMtime,
+                    })
+                    .returning();
+                return nb.id;
+            };
+
+            // 决定 effectiveParent：若 rootDir 直接含 .md，则套 Imported 包装
+            let effectiveParent = notebookId;
+            if (hasMdDirectly(rootDir)) {
+                effectiveParent = await getOrCreateWrapper(notebookId, new Date());
+            }
+
             async function importDir(dir: string, parentDbId: number) {
                 const items = readdirSync(dir);
 
-                // 第一遍：创建子目录（notebooks）
+                // 第一遍：递归创建子目录（notebooks）
                 for (const name of items) {
                     const fullPath = join(dir, name);
                     let st;
@@ -107,15 +177,29 @@ export const importZip = async (c: Context) => {
                     }
                 }
 
-                // 第二遍：收集当前目录下的 .md 文件
+                // 第二遍：处理当前目录下的 .md（按 title 去重）
                 for (const name of items) {
                     const fullPath = join(dir, name);
                     let st;
                     try { st = statSync(fullPath); } catch { continue; }
                     if (st.isFile() && name.endsWith(".md")) {
                         const title = name.replace(/\.md$/, "");
+
+                        // 去重：同一父笔记本下同 title 且未删除则跳过
+                        const dup = await tx
+                            .select({ id: schema.notes.id })
+                            .from(schema.notes)
+                            .where(and(
+                                eq(schema.notes.user_id, uid),
+                                eq(schema.notes.notebook_id, parentDbId),
+                                eq(schema.notes.title, title),
+                                eq(schema.notes.is_deleted, 0),
+                            ))
+                            .get();
+                        if (dup) continue;
+
                         const content = readFileSync(fullPath, "utf-8");
-                        noteEntries.push({
+                        pending.push({
                             notebookId: parentDbId,
                             title,
                             content,
@@ -124,14 +208,13 @@ export const importZip = async (c: Context) => {
                     }
                 }
             }
-            await importDir(rootDir, notebookId);
-        });
 
-        // 事务 #2：批量 INSERT notes（单条 SQL）
-        if (noteEntries.length > 0) {
-            await db.transaction(async (tx) => {
+            await importDir(rootDir, effectiveParent);
+
+            // 全部收完后，在同一事务内批量 INSERT notes
+            if (pending.length > 0) {
                 await tx.insert(schema.notes).values(
-                    noteEntries.map((e) => ({
+                    pending.map((e) => ({
                         user_id: uid,
                         notebook_id: e.notebookId,
                         title: e.title,
@@ -143,8 +226,8 @@ export const importZip = async (c: Context) => {
                         updated_at: e.mtime,
                     }))
                 );
-            });
-        }
+            }
+        });
 
         return c.json({ code: 200, msg: "import.success", data: null });
     } finally {

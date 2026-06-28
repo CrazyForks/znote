@@ -554,6 +554,15 @@ const handleSelectNote = async (id: number) => {
     router.push(`/app/note/${id}`);
 };
 
+/**
+ * 导入成功后的局部刷新：
+ * 重新拉一次 /api/user/notebook/list 更新分类树，不重载整页
+ * 保留用户当前选中的笔记本/分类/笔记（silentRefreshTree 内部会校验有效性）
+ */
+const handleImported = async () => {
+    await noteStore.silentRefreshTree();
+};
+
 /** 移动端返回笔记列表 */
 const handleMobileBack = () => {
     drawerOpen.value = false;
@@ -903,6 +912,7 @@ const handleSaveTitle = async () => {
     <ImportDialog
       v-model:show="showImportDialog"
       :notebook-id="noteStore.activeNotebookId"
+      @imported="handleImported"
     />
 
     <!-- 导出 ZIP -->

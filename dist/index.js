@@ -11539,9 +11539,19 @@ var getNoteVersion = async (c) => {
 };
 
 // backend/api/import.ts
+import { and as and6, eq as eq7 } from "drizzle-orm";
 var import_adm_zip = __toESM(require_adm_zip(), 1);
 import { join as join4 } from "path";
 import { mkdirSync as mkdirSync2, readdirSync, readFileSync, rmSync, statSync } from "fs";
+var WRAPPER_NAME = "Imported";
+var WRAPPER_DESC = "Auto-created from ZIP import";
+var decodeFileName = (buf) => {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder("gbk").decode(buf);
+  }
+};
 var importZip = async (c) => {
   const uid = Number(c.get("uid"));
   const formData = await c.req.formData();
@@ -11562,9 +11572,22 @@ var importZip = async (c) => {
   try {
     const zipPath = join4(tmpDir, "import.zip");
     await Bun.write(zipPath, file);
-    const zip = new import_adm_zip.default(zipPath);
+    const zip = new import_adm_zip.default(zipPath, {
+      decoder: {
+        efs: true,
+        decode: decodeFileName,
+        encode: (data) => Buffer.from(data, "utf8")
+      }
+    });
     const extractDir = join4(tmpDir, "extracted");
     zip.extractAllTo(extractDir, true);
+    const hasMdDirectly = (dir) => readdirSync(dir).some((name) => {
+      try {
+        return name.endsWith(".md") && statSync(join4(dir, name)).isFile();
+      } catch {
+        return false;
+      }
+    });
     const entries = readdirSync(extractDir);
     const topDirs = entries.filter((e) => {
       try {
@@ -11582,10 +11605,31 @@ var importZip = async (c) => {
     });
     let rootDir = extractDir;
     if (topDirs.length === 1 && topMds.length === 0) {
-      rootDir = join4(extractDir, topDirs[0]);
+      if (!hasMdDirectly(join4(extractDir, topDirs[0]))) {
+        rootDir = join4(extractDir, topDirs[0]);
+      }
     }
-    const noteEntries = [];
     await db.transaction(async (tx) => {
+      const pending = [];
+      const getOrCreateWrapper = async (parentDbId, fallbackMtime) => {
+        const existing = await tx.select({ id: notebooks.id }).from(notebooks).where(and6(eq7(notebooks.user_id, uid), eq7(notebooks.parent_id, parentDbId), eq7(notebooks.title, WRAPPER_NAME))).get();
+        if (existing)
+          return existing.id;
+        const [nb] = await tx.insert(notebooks).values({
+          user_id: uid,
+          parent_id: parentDbId,
+          title: WRAPPER_NAME,
+          description: WRAPPER_DESC,
+          sort_order: 0,
+          created_at: fallbackMtime,
+          updated_at: fallbackMtime
+        }).returning();
+        return nb.id;
+      };
+      let effectiveParent = notebookId;
+      if (hasMdDirectly(rootDir)) {
+        effectiveParent = await getOrCreateWrapper(notebookId, new Date);
+      }
       async function importDir(dir, parentDbId) {
         const items = readdirSync(dir);
         for (const name of items) {
@@ -11619,8 +11663,11 @@ var importZip = async (c) => {
           }
           if (st.isFile() && name.endsWith(".md")) {
             const title = name.replace(/\.md$/, "");
+            const dup = await tx.select({ id: notes.id }).from(notes).where(and6(eq7(notes.user_id, uid), eq7(notes.notebook_id, parentDbId), eq7(notes.title, title), eq7(notes.is_deleted, 0))).get();
+            if (dup)
+              continue;
             const content = readFileSync(fullPath, "utf-8");
-            noteEntries.push({
+            pending.push({
               notebookId: parentDbId,
               title,
               content,
@@ -11629,11 +11676,9 @@ var importZip = async (c) => {
           }
         }
       }
-      await importDir(rootDir, notebookId);
-    });
-    if (noteEntries.length > 0) {
-      await db.transaction(async (tx) => {
-        await tx.insert(notes).values(noteEntries.map((e) => ({
+      await importDir(rootDir, effectiveParent);
+      if (pending.length > 0) {
+        await tx.insert(notes).values(pending.map((e) => ({
           user_id: uid,
           notebook_id: e.notebookId,
           title: e.title,
@@ -11644,8 +11689,8 @@ var importZip = async (c) => {
           created_at: e.mtime,
           updated_at: e.mtime
         })));
-      });
-    }
+      }
+    });
     return c.json({ code: 200, msg: "import.success", data: null });
   } finally {
     try {
@@ -11658,7 +11703,7 @@ var importZip = async (c) => {
 var import_adm_zip2 = __toESM(require_adm_zip(), 1);
 import { join as join5 } from "path";
 import { mkdirSync as mkdirSync3, writeFileSync, rmSync as rmSync2, utimesSync } from "fs";
-import { eq as eq7, and as and6, inArray as inArray3 } from "drizzle-orm";
+import { eq as eq8, and as and7, inArray as inArray3 } from "drizzle-orm";
 function sanitizeFilename(name) {
   return name.replace(/[\\/:*?"<>|]/g, "_");
 }
@@ -11668,7 +11713,7 @@ function truncateFilename(name, maxLength = 200) {
   return name.slice(0, maxLength);
 }
 async function getAllChildNotebookIds(parentId) {
-  const children = await db.select({ id: notebooks.id }).from(notebooks).where(eq7(notebooks.parent_id, parentId));
+  const children = await db.select({ id: notebooks.id }).from(notebooks).where(eq8(notebooks.parent_id, parentId));
   let ids = children.map((c) => c.id);
   for (const child of children) {
     const childIds = await getAllChildNotebookIds(child.id);
@@ -11696,7 +11741,7 @@ var exportZip = async (c) => {
   if (!owned) {
     return c.json({ code: -1000, msg: "export.notebook_not_found", data: null });
   }
-  const rootNotebook = await db.select().from(notebooks).where(eq7(notebooks.id, notebookId)).get();
+  const rootNotebook = await db.select().from(notebooks).where(eq8(notebooks.id, notebookId)).get();
   if (!rootNotebook) {
     return c.json({ code: -1000, msg: "export.notebook_not_found", data: null });
   }
@@ -11708,7 +11753,7 @@ var exportZip = async (c) => {
     content: notes.content,
     created_at: notes.created_at,
     updated_at: notes.updated_at
-  }).from(notes).where(and6(inArray3(notes.notebook_id, allNotebookIds), eq7(notes.is_deleted, 0)));
+  }).from(notes).where(and7(inArray3(notes.notebook_id, allNotebookIds), eq8(notes.is_deleted, 0)));
   if (notes2.length === 0) {
     return c.json({ code: -1000, msg: "export.no_notes", data: null });
   }
@@ -11867,7 +11912,7 @@ var searchNotes = async (c) => {
 };
 
 // backend/api/doc.ts
-import { and as and7, asc as asc2, desc as desc4, eq as eq8, inArray as inArray4, isNull as isNull2, ne } from "drizzle-orm";
+import { and as and8, asc as asc2, desc as desc4, eq as eq9, inArray as inArray4, isNull as isNull2, ne } from "drizzle-orm";
 var collectSubtreeIds = async (rootId) => {
   const ids = new Set([rootId]);
   let current = [rootId];
@@ -11891,7 +11936,7 @@ var getAllTopLevelNotebooks = async (c) => {
     user_id: notebooks.user_id,
     username: users.username,
     sort_order: notebooks.sort_order
-  }).from(notebooks).leftJoin(users, eq8(notebooks.user_id, users.id)).where(isNull2(notebooks.parent_id)).orderBy(asc2(notebooks.sort_order)).all();
+  }).from(notebooks).leftJoin(users, eq9(notebooks.user_id, users.id)).where(isNull2(notebooks.parent_id)).orderBy(asc2(notebooks.sort_order)).all();
   return c.json({
     code: 200,
     msg: "doc.notebook.top.success",
@@ -11911,7 +11956,7 @@ var listDocs = async (c) => {
     updated_at: docs.updated_at,
     notebook_title: notebooks.title,
     notebook_description: notebooks.description
-  }).from(docs).leftJoin(notebooks, eq8(docs.notebook_id, notebooks.id)).orderBy(desc4(docs.id)).all();
+  }).from(docs).leftJoin(notebooks, eq9(docs.notebook_id, notebooks.id)).orderBy(desc4(docs.id)).all();
   return c.json({
     code: 200,
     msg: "doc.list.success",
@@ -11924,14 +11969,14 @@ var createDoc = async (c) => {
   if (!notebook_id || typeof notebook_id !== "number") {
     return c.json({ code: -1000, msg: "doc.create.notebook_required", data: null });
   }
-  const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq8(notebooks.id, notebook_id)).get();
+  const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq9(notebooks.id, notebook_id)).get();
   if (!notebook) {
     return c.json({ code: -1000, msg: "doc.create.notebook_not_found", data: null });
   }
   if (notebook.parent_id !== null) {
     return c.json({ code: -1000, msg: "doc.create.notebook_not_top_level", data: null });
   }
-  const existingDocByNotebook = await db.select({ id: docs.id }).from(docs).where(eq8(docs.notebook_id, notebook_id)).get();
+  const existingDocByNotebook = await db.select({ id: docs.id }).from(docs).where(eq9(docs.notebook_id, notebook_id)).get();
   if (existingDocByNotebook) {
     return c.json({ code: -1000, msg: "doc.create.notebook_already_published", data: null });
   }
@@ -11942,7 +11987,7 @@ var createDoc = async (c) => {
   if (!vSlug(trimmedSlug)) {
     return c.json({ code: -1000, msg: "doc.create.slug_invalid", data: null });
   }
-  const existingDocBySlug = await db.select({ id: docs.id }).from(docs).where(eq8(docs.slug, trimmedSlug)).get();
+  const existingDocBySlug = await db.select({ id: docs.id }).from(docs).where(eq9(docs.slug, trimmedSlug)).get();
   if (existingDocBySlug) {
     return c.json({ code: -1000, msg: "doc.create.slug_exists", data: null });
   }
@@ -11972,19 +12017,19 @@ var updateDoc = async (c) => {
   if (!id || typeof id !== "number") {
     return c.json({ code: -1000, msg: "doc.update.id_required", data: null });
   }
-  const existingDoc = await db.select().from(docs).where(eq8(docs.id, id)).get();
+  const existingDoc = await db.select().from(docs).where(eq9(docs.id, id)).get();
   if (!existingDoc) {
     return c.json({ code: -1000, msg: "doc.update.not_found", data: null });
   }
   if (notebook_id !== undefined) {
-    const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq8(notebooks.id, notebook_id)).get();
+    const notebook = await db.select({ id: notebooks.id, parent_id: notebooks.parent_id }).from(notebooks).where(eq9(notebooks.id, notebook_id)).get();
     if (!notebook) {
       return c.json({ code: -1000, msg: "doc.update.notebook_not_found", data: null });
     }
     if (notebook.parent_id !== null) {
       return c.json({ code: -1000, msg: "doc.update.notebook_not_top_level", data: null });
     }
-    const conflict = await db.select({ id: docs.id }).from(docs).where(and7(eq8(docs.notebook_id, notebook_id), ne(docs.id, id))).get();
+    const conflict = await db.select({ id: docs.id }).from(docs).where(and8(eq9(docs.notebook_id, notebook_id), ne(docs.id, id))).get();
     if (conflict) {
       return c.json({ code: -1000, msg: "doc.update.notebook_already_published", data: null });
     }
@@ -11998,7 +12043,7 @@ var updateDoc = async (c) => {
     if (!vSlug(trimmedSlug)) {
       return c.json({ code: -1000, msg: "doc.update.slug_invalid", data: null });
     }
-    const conflict = await db.select({ id: docs.id }).from(docs).where(and7(eq8(docs.slug, trimmedSlug), ne(docs.id, id))).get();
+    const conflict = await db.select({ id: docs.id }).from(docs).where(and8(eq9(docs.slug, trimmedSlug), ne(docs.id, id))).get();
     if (conflict) {
       return c.json({ code: -1000, msg: "doc.update.slug_exists", data: null });
     }
@@ -12019,7 +12064,7 @@ var updateDoc = async (c) => {
     updates.keywords = keywords;
   if (status !== undefined)
     updates.status = status;
-  const result = await db.update(docs).set(updates).where(eq8(docs.id, id)).returning().get();
+  const result = await db.update(docs).set(updates).where(eq9(docs.id, id)).returning().get();
   return c.json({
     code: 200,
     msg: "doc.update.success",
@@ -12050,11 +12095,11 @@ var deleteDoc = async (c) => {
 };
 var getPublicDoc = async (c) => {
   const slug = c.req.param("slug");
-  const doc = await db.select().from(docs).where(eq8(docs.slug, slug)).get();
+  const doc = await db.select().from(docs).where(eq9(docs.slug, slug)).get();
   if (!doc || doc.status !== "active") {
     return c.json({ code: -1000, msg: "doc.public.not_found", data: null });
   }
-  const rootNotebook = await db.select({ title: notebooks.title, description: notebooks.description }).from(notebooks).where(eq8(notebooks.id, doc.notebook_id)).get();
+  const rootNotebook = await db.select({ title: notebooks.title, description: notebooks.description }).from(notebooks).where(eq9(notebooks.id, doc.notebook_id)).get();
   const notebookIds = await collectSubtreeIds(doc.notebook_id);
   const idList = [...notebookIds];
   const notebooks2 = await db.select({
@@ -12071,7 +12116,7 @@ var getPublicDoc = async (c) => {
     sort_order: notes.sort_order,
     created_at: notes.created_at,
     updated_at: notes.updated_at
-  }).from(notes).where(and7(inArray4(notes.notebook_id, idList), eq8(notes.is_deleted, 0))).orderBy(desc4(notes.is_pinned), asc2(notes.sort_order), desc4(notes.created_at)).all();
+  }).from(notes).where(and8(inArray4(notes.notebook_id, idList), eq9(notes.is_deleted, 0))).orderBy(desc4(notes.is_pinned), asc2(notes.sort_order), desc4(notes.created_at)).all();
   const nodeMap = new Map;
   for (const nb of notebooks2) {
     nodeMap.set(nb.id, {
@@ -12115,11 +12160,11 @@ var getPublicNote = async (c) => {
   if (!noteId || isNaN(noteId)) {
     return c.json({ code: -1000, msg: "doc.note.id_required", data: null });
   }
-  const doc = await db.select().from(docs).where(eq8(docs.slug, slug)).get();
+  const doc = await db.select().from(docs).where(eq9(docs.slug, slug)).get();
   if (!doc || doc.status !== "active") {
     return c.json({ code: -1000, msg: "doc.note.not_found", data: null });
   }
-  const note = await db.select().from(notes).where(and7(eq8(notes.id, noteId), eq8(notes.is_deleted, 0))).get();
+  const note = await db.select().from(notes).where(and8(eq9(notes.id, noteId), eq9(notes.is_deleted, 0))).get();
   if (!note) {
     return c.json({ code: -1000, msg: "doc.note.not_found", data: null });
   }
@@ -12141,18 +12186,18 @@ var getPublicNote = async (c) => {
 };
 
 // backend/middleware/auth.ts
-import { and as and8, eq as eq9 } from "drizzle-orm";
+import { and as and9, eq as eq10 } from "drizzle-orm";
 var verifyApiToken = async (token, c, role = "user") => {
   if (!token || token.length < 32) {
     return false;
   }
   try {
-    const session = await db.select().from(sessions).where(and8(eq9(sessions.token, token), eq9(sessions.status, "active"))).get();
+    const session = await db.select().from(sessions).where(and9(eq10(sessions.token, token), eq10(sessions.status, "active"))).get();
     if (!session) {
       return false;
     }
     if (session.expires_at.getTime() <= Date.now()) {
-      await db.update(sessions).set({ status: "expired" }).where(eq9(sessions.id, session.id)).run();
+      await db.update(sessions).set({ status: "expired" }).where(eq10(sessions.id, session.id)).run();
       return false;
     }
     if (role === "admin" && session.role !== "admin") {
@@ -12161,7 +12206,7 @@ var verifyApiToken = async (token, c, role = "user") => {
     const user = await db.select({
       id: users.id,
       username: users.username
-    }).from(users).where(and8(eq9(users.id, session.uid), eq9(users.status, "active"))).get();
+    }).from(users).where(and9(eq10(users.id, session.uid), eq10(users.status, "active"))).get();
     if (!user) {
       return false;
     }

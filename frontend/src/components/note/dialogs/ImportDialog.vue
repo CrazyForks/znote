@@ -3,7 +3,8 @@
  * ZIP 导入笔记对话框
  *
  * 支持点击或拖拽上传 .zip 文件（最大 10MB）
- * 提交后调用 POST /api/user/import，成功则刷新页面
+ * 提交后调用 POST /api/user/import，成功则关闭弹窗并 emit('imported')，
+ * 由父组件静默刷新笔记本树（不重载整页）
  */
 import { ref, watch } from "vue";
 import { NModal, NSpin, useMessage } from "naive-ui";
@@ -22,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: "update:show", value: boolean): void;
+    (e: "imported"): void;
 }>();
 
 /** 隐藏的文件选择框 */
@@ -106,8 +108,8 @@ const handleImport = async () => {
         if (res.data?.code === 200) {
             message.success(t("import.success"));
             emit("update:show", false);
-            // 延迟刷新，让用户看到成功提示
-            setTimeout(() => location.reload(), 800);
+            // 延迟触发，保留 800ms 让用户看清成功提示
+            setTimeout(() => emit("imported"), 800);
         } else {
             message.error(res.data?.msg || t("import.failed"));
         }
