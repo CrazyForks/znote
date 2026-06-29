@@ -53,8 +53,8 @@ const features: FeatureItem[] = [
     { icon: "ri:history-line",        titleKey: "home.features.version.title",  descKey: "home.features.version.desc" },
     { icon: "ri:team-line",           titleKey: "home.features.multiuser.title", descKey: "home.features.multiuser.desc" },
     { icon: "ri:leaf-line",           titleKey: "home.features.light.title",    descKey: "home.features.light.desc" },
-    { icon: "ri:search-line",         titleKey: "home.features.search.title",   descKey: "home.features.search.desc" },
-    { icon: "ri:plug-line",           titleKey: "home.features.api.title",      descKey: "home.features.api.desc" },
+    { icon: "ri:file-text-line",      titleKey: "home.features.doc.title",      descKey: "home.features.doc.desc" },
+    { icon: "ri:share-box-line",      titleKey: "home.features.share.title",    descKey: "home.features.share.desc" },
 ];
 
 // ==================== 登录态 ====================
@@ -246,6 +246,98 @@ onMounted(() => {
       </div>
     </section>
 
+    <!-- ==================== 交流与反馈 ==================== -->
+    <section class="relative border-t border-slate-800/40 bg-slate-900/20 py-10 sm:py-16">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <!-- 标题 -->
+        <div class="mb-10 text-center sm:mb-14">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+            {{ t("home.contact.title") }}
+          </h2>
+          <p class="mt-3 text-slate-400 sm:mt-4">
+            {{ t("home.contact.subtitle") }}
+          </p>
+        </div>
+
+        <div class="flex flex-col items-center gap-10">
+          <!-- QQ群二维码：单独一行居中 -->
+          <div class="contact-qr group">
+            <div
+              class="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:border-blue-500/50 group-hover:bg-slate-900/80 group-hover:shadow-xl group-hover:shadow-blue-500/10"
+            >
+              <div
+                class="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/0 to-cyan-500/0 transition-all duration-500 group-hover:from-blue-500/10 group-hover:to-cyan-500/10"
+                aria-hidden="true"
+              />
+              <div class="relative">
+                <img
+                  src="https://img.rss.ink/2026/06/29/Bo0K0ULS.jpg"
+                  :alt="t('home.contact.qq_group')"
+                  class="block w-48 rounded-lg bg-white object-contain p-1 sm:w-56"
+                  loading="lazy"
+                />
+                <p class="mt-3 text-center text-xs text-slate-500">
+                  {{ t("home.contact.scan_hint") }}
+                </p>
+              </div>
+            </div>
+            <div class="mt-4 text-center">
+              <p class="text-sm text-slate-400">{{ t("home.contact.qq_group") }}</p>
+              <p class="mt-1 font-mono text-lg font-semibold tracking-wider text-slate-100">
+                253828849
+              </p>
+            </div>
+          </div>
+
+          <!-- 链接区：博客 + X 一行 -->
+          <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <a
+              href="https://blog.xiaoz.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="contact-link group"
+            >
+              <span
+                class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400 ring-1 ring-blue-400/20 transition-colors group-hover:from-blue-500/30 group-hover:to-cyan-500/30"
+              >
+                <ZIcon name="ri:article-line" :size="20" color="currentColor" />
+              </span>
+              <span class="flex-1 text-sm font-medium text-slate-200">
+                {{ t("home.contact.blog") }}
+              </span>
+              <ZIcon
+                name="ri:external-link-line"
+                :size="16"
+                color="currentColor"
+                class="text-slate-500 transition-colors group-hover:text-blue-400"
+              />
+            </a>
+            <a
+              href="https://x.com/xiaozblog"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="contact-link group"
+            >
+              <span
+                class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400 ring-1 ring-blue-400/20 transition-colors group-hover:from-blue-500/30 group-hover:to-cyan-500/30"
+              >
+                <ZIcon name="ri:twitter-x-line" :size="20" color="currentColor" />
+              </span>
+              <span class="flex-1 text-sm font-medium text-slate-200">
+                {{ t("home.contact.x") }}
+              </span>
+              <ZIcon
+                name="ri:external-link-line"
+                :size="16"
+                color="currentColor"
+                class="text-slate-500 transition-colors group-hover:text-blue-400"
+              />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ==================== Footer ==================== -->
     <footer class="border-t border-slate-800/60 py-8 sm:py-10">
       <div class="mx-auto max-w-7xl px-4 text-center sm:px-6">
@@ -330,6 +422,16 @@ onMounted(() => {
   @apply inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300 ring-1 ring-blue-400/20;
 }
 
+/* ==================== 交流与反馈 ==================== */
+
+/* 链接胶囊：与 feature-card 同色系，hover 时浅描边+轻微抬升 */
+.contact-link {
+  @apply inline-flex items-center gap-3 whitespace-nowrap rounded-xl border border-slate-700 bg-slate-900/40 px-5 py-3
+         backdrop-blur transition-all duration-200
+         hover:-translate-y-0.5 hover:border-blue-500/50 hover:bg-slate-800/60 hover:shadow-lg hover:shadow-blue-500/10
+         active:translate-y-0;
+}
+
 /* ==================== Hero 背景光晕 ==================== */
 
 .hero-blob {
@@ -384,6 +486,7 @@ onMounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .hero-blob,
   .feature-card,
+  .contact-link,
   .btn-base,
   .btn-text-plain,
   .btn-outline {
