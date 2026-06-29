@@ -21,6 +21,7 @@ export const index = async (c: Context) => {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>${title}</title>
+    <link rel="icon" href="/static/images/znote.svg" />
     <script type="module" crossorigin src="/static/assets/index.${APP_DATE}.js"></script>
     <link rel="stylesheet" href="/static/assets/index.${APP_DATE}.css" />
     <style>
@@ -32,7 +33,7 @@ export const index = async (c: Context) => {
         align-items: center;
         justify-content: center;
         color: #64748b;
-        font: 14px sans-serif;
+        font: bold 16px sans-serif;
       }
       #app:not(:empty) + #app-loading,
       #app:not(:empty) ~ #app-loading {

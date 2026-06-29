@@ -10428,8 +10428,8 @@ var getBearerToken = (c) => {
 };
 
 // backend/api/info.ts
-var APP_VERSION = "0.3.0";
-var APP_DATE = "2026062807";
+var APP_VERSION = "0.3.1";
+var APP_DATE = "2026062900";
 var getAppInfo = async (c) => {
   const userCount = await db.select({ count: count() }).from(users);
   return c.json({
@@ -10476,6 +10476,7 @@ var index2 = async (c) => {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>${title}</title>
+    <link rel="icon" href="/static/images/znote.svg" />
     <script type="module" crossorigin src="/static/assets/index.${APP_DATE}.js"></script>
     <link rel="stylesheet" href="/static/assets/index.${APP_DATE}.css" />
     <style>
@@ -10487,7 +10488,7 @@ var index2 = async (c) => {
         align-items: center;
         justify-content: center;
         color: #64748b;
-        font: 14px sans-serif;
+        font: bold 16px sans-serif;
       }
       #app:not(:empty) + #app-loading,
       #app:not(:empty) ~ #app-loading {
@@ -10498,7 +10499,7 @@ var index2 = async (c) => {
   </head>
   <body>
     <div id="app"></div>
-    <div id="app-loading">\u6B63\u5728\u52A0\u8F7D ${title}...</div>
+    <div id="app-loading">Loading...</div>
   </body>
 </html>`);
 };
@@ -11503,6 +11504,10 @@ var createShare = async (c) => {
   const note = await db.select({ id: notes.id }).from(notes).where(and5(eq6(notes.id, note_id), eq6(notes.user_id, uid), eq6(notes.is_deleted, 0))).get();
   if (!note) {
     return c.json({ code: -1000, msg: "share.create.not_found", data: null });
+  }
+  const shareCount = await db.select({ count: sql3`count(*)` }).from(noteShares2).where(eq6(noteShares2.user_id, uid)).get();
+  if (shareCount && shareCount.count >= 100) {
+    return c.json({ code: -1000, msg: "share.create.limit_reached", data: null });
   }
   const shareId = randomString(8);
   const now = new Date;
