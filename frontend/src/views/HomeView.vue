@@ -11,6 +11,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { NDrawer, NDrawerContent, NQrCode } from "naive-ui";
 import { useSystemStore } from "@/stores/system";
 import { useUserStore } from "@/stores/user";
 import req from "@/utils/req";
@@ -35,6 +36,9 @@ if (mediaQuery) {
 }
 
 // ==================== 特性数据 ====================
+
+// Android APK 下载地址（PC 端用作二维码内容，移动端用作直接跳转链接）
+const ANDROID_DOWNLOAD_URL = "https://dwz.ovh/znote-app";
 
 interface FeatureItem {
     icon: string;
@@ -78,11 +82,58 @@ const primaryCtaPath = computed(() => {
     return isLoggedIn.value ? "/app" : "/user/login";
 });
 
+// ==================== 导航菜单数据 ====================
+
+interface NavLinkItem {
+    id: string;
+    labelKey: string;
+    icon: string;
+}
+
+/** 顶部导航锚点链接（桌面端显示全部；移动端折叠进汉堡） */
+const navLinks: NavLinkItem[] = [
+    { id: "features",  labelKey: "home.nav.features", icon: "ri:star-line" },
+    { id: "mobile-app", labelKey: "home.nav.app",     icon: "ri:smartphone-line" },
+    { id: "contact",   labelKey: "home.nav.contact",  icon: "ri:chat-3-line" },
+];
+
+// ==================== 抽屉（移动端汉堡菜单） ====================
+
+const drawerVisible = ref(false);
+
+/** 打开汉堡菜单 */
+const openDrawer = () => {
+    drawerVisible.value = true;
+};
+
+/** 关闭汉堡菜单 */
+const closeDrawer = () => {
+    drawerVisible.value = false;
+};
+
 // ==================== 滚动 ====================
 
-/** 平滑滚动到特性区 */
-const scrollToFeatures = () => {
-    document.getElementById("features")?.scrollIntoView({ behavior: "smooth", block: "start" });
+/** 平滑滚动到指定 section */
+const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+/** 点击 nav 锚点链接：移动端先关闭抽屉再滚动 */
+const handleNavClick = (id: string) => {
+    closeDrawer();
+    // 等待抽屉关闭动画完成后再滚动，避免视觉抖动
+    setTimeout(() => scrollToSection(id), 50);
+};
+
+/** Hero 区域「了解更多」CTA：滚动到特性区 */
+const scrollToFeatures = () => scrollToSection("features");
+
+// ==================== 退出登录 ====================
+
+/** 退出登录（drawer 内使用） */
+const handleLogout = async () => {
+    closeDrawer();
+    await userStore.logout();
 };
 
 // ==================== 挂载 ====================
@@ -103,7 +154,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100">
+  <div class="relative min-h-screen overflow-x-clip bg-slate-950 text-slate-100">
     <!-- ==================== 顶部导航 ==================== -->
     <nav
       class="sticky top-0 z-50 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur-md"
@@ -117,29 +168,38 @@ onMounted(() => {
 
         <!-- 右侧操作区 -->
         <div class="flex items-center gap-2 sm:gap-3">
-          <!-- 已登录：显示「我的笔记」 -->
-          <template v-if="isLoggedIn">
-            <button class="btn-base btn-primary btn-md" @click="router.push('/app')">
-              <ZIcon name="ri:edit-box-line" :size="16" color="currentColor" />
-              <span>{{ t("home.nav.notes") }}</span>
-            </button>
-          </template>
-
-          <!-- 未登录：登录 / 注册均为纯文字按钮 -->
-          <template v-else>
-            <button class="btn-text-plain" @click="router.push('/user/login')">
-              {{ t("home.nav.login") }}
-            </button>
+          <!-- 桌面端：锚点链接 + 登录/笔记（紧贴一组） -->
+          <div class="hidden items-center gap-1 sm:flex sm:gap-2">
+            <!-- 锚点链接：特性 / APP / 交流群 -->
             <button
-              v-if="systemStore.status.allow_register"
+              v-for="link in navLinks"
+              :key="link.id"
               class="btn-text-plain"
-              @click="router.push('/user/register')"
+              @click="scrollToSection(link.id)"
             >
-              {{ t("home.nav.register") }}
+              {{ t(link.labelKey) }}
             </button>
-          </template>
 
-          <!-- GitHub 图标按钮（加大尺寸） -->
+            <!-- 分组分隔 -->
+            <span class="mx-1 hidden h-4 w-px bg-slate-700/60 sm:inline-block" aria-hidden="true" />
+
+            <!-- 已登录：显示「我的笔记」 -->
+            <template v-if="isLoggedIn">
+              <button class="btn-base btn-primary btn-md" @click="router.push('/app')">
+                <ZIcon name="ri:edit-box-line" :size="16" color="currentColor" />
+                <span>{{ t("home.nav.notes") }}</span>
+              </button>
+            </template>
+
+            <!-- 未登录：仅显示登录按钮 -->
+            <template v-else>
+              <button class="btn-text-plain" @click="router.push('/user/login')">
+                {{ t("home.nav.login") }}
+              </button>
+            </template>
+          </div>
+
+          <!-- GitHub 图标按钮（全端可见） -->
           <a
             href="https://github.com/helloxz/znote"
             target="_blank"
@@ -150,9 +210,90 @@ onMounted(() => {
           >
             <ZIcon name="ri:github-fill" :size="26" color="currentColor" />
           </a>
+
+          <!-- 移动端：汉堡按钮 -->
+          <button
+            class="flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 transition-all duration-200 hover:scale-105 hover:bg-slate-800/70 hover:text-white active:scale-95 sm:hidden"
+            :title="t('home.nav.menu')"
+            :aria-label="t('home.nav.menu')"
+            @click="openDrawer"
+          >
+            <ZIcon name="ri:menu-line" :size="26" color="currentColor" />
+          </button>
         </div>
       </div>
     </nav>
+
+    <!-- ==================== 移动端汉堡抽屉 ==================== -->
+    <NDrawer v-model:show="drawerVisible" :width="280" placement="right">
+      <NDrawerContent
+        :closable="false"
+        :native-scrollbar="false"
+        class="!bg-slate-950 !text-slate-100"
+      >
+        <div class="flex h-full flex-col">
+          <!-- 抽屉头部：Logo + 关闭 -->
+          <div class="mb-6 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <ZIcon name="ri:booklet-line" :size="24" color="#60a5fa" class="text-blue-400" />
+              <span class="text-lg font-semibold tracking-tight">ZNote</span>
+            </div>
+            <button
+              class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800/70 hover:text-white"
+              :aria-label="t('home.nav.menu')"
+              @click="closeDrawer"
+            >
+              <ZIcon name="ri:close-line" :size="22" color="currentColor" />
+            </button>
+          </div>
+
+          <!-- 锚点链接组 -->
+          <div class="flex flex-col">
+            <button
+              v-for="link in navLinks"
+              :key="link.id"
+              class="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-slate-800/60 hover:text-white"
+              @click="handleNavClick(link.id)"
+            >
+              <ZIcon :name="link.icon" :size="20" color="currentColor" class="text-slate-400" />
+              <span>{{ t(link.labelKey) }}</span>
+            </button>
+          </div>
+
+          <!-- 分隔线 -->
+          <div class="my-4 h-px bg-slate-800/80" />
+
+          <!-- 登录态感知组 -->
+          <div class="flex flex-col">
+            <template v-if="isLoggedIn">
+              <button
+                class="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-slate-800/60 hover:text-white"
+                @click="closeDrawer(); router.push('/app')"
+              >
+                <ZIcon name="ri:edit-box-line" :size="20" color="currentColor" class="text-slate-400" />
+                <span>{{ t("home.nav.notes") }}</span>
+              </button>
+              <button
+                class="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-rose-300 transition hover:bg-rose-500/10 hover:text-rose-200"
+                @click="handleLogout"
+              >
+                <ZIcon name="ri:logout-box-r-line" :size="20" color="currentColor" />
+                <span>{{ t("home.nav.logout") }}</span>
+              </button>
+            </template>
+            <template v-else>
+              <button
+                class="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-200 transition hover:bg-slate-800/60 hover:text-white"
+                @click="closeDrawer(); router.push('/user/login')"
+              >
+                <ZIcon name="ri:login-box-line" :size="20" color="currentColor" class="text-slate-400" />
+                <span>{{ t("home.nav.login") }}</span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </NDrawerContent>
+    </NDrawer>
 
     <!-- ==================== Hero ==================== -->
     <section class="relative overflow-hidden">
@@ -207,7 +348,7 @@ onMounted(() => {
     </section>
 
     <!-- ==================== 特性区 ==================== -->
-    <section id="features" class="relative py-16 sm:py-24">
+    <section id="features" class="relative scroll-mt-16 py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-4 sm:px-6">
         <div class="mb-12 text-center sm:mb-16">
           <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -248,8 +389,128 @@ onMounted(() => {
       </div>
     </section>
 
+    <!-- ==================== 移动端 APP ==================== -->
+    <section id="mobile-app" class="relative scroll-mt-16">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <!-- 标题 -->
+        <div class="mb-12 text-center sm:mb-16">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">
+            {{ t("home.app.title") }}
+          </h2>
+          <p class="mt-3 text-slate-400 sm:mt-4">
+            {{ t("home.app.subtitle") }}
+          </p>
+        </div>
+
+        <!-- iOS / Android 双卡 -->
+        <div class="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-2">
+          <!-- iOS 卡片：开发中占位 -->
+          <div class="app-card group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:bg-slate-900/80 hover:shadow-xl hover:shadow-blue-500/10 sm:p-8">
+            <div
+              class="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/0 to-cyan-500/0 transition-all duration-500 group-hover:from-blue-500/10 group-hover:to-cyan-500/10"
+              aria-hidden="true"
+            />
+            <div class="relative flex flex-col items-center text-center">
+              <div
+                class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-500/20 to-slate-400/20 text-slate-300 ring-1 ring-slate-400/20"
+              >
+                <ZIcon name="ri:apple-fill" :size="28" color="currentColor" />
+              </div>
+              <h3 class="mt-5 text-xl font-semibold text-slate-100 sm:text-2xl">
+                {{ t("home.app.ios.title") }}
+              </h3>
+              <!-- 开发中徽章 -->
+              <span class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-700/40 px-3 py-1 text-xs font-medium text-slate-400 ring-1 ring-slate-500/20">
+                <ZIcon name="ri:time-line" :size="12" color="currentColor" />
+                {{ t("home.app.ios.badge") }}
+              </span>
+              <p class="mt-4 text-sm leading-relaxed text-slate-400">
+                {{ t("home.app.ios.desc") }}
+              </p>
+              <!-- 禁用的 App Store 徽章（占位展示） -->
+              <div
+                class="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-2 opacity-50 grayscale"
+                :title="t('home.app.ios.badge')"
+              >
+                <ZIcon name="ri:apple-fill" :size="20" color="currentColor" class="text-slate-300" />
+                <span class="flex flex-col items-start leading-tight">
+                  <span class="text-[10px] uppercase tracking-wide text-slate-500">Download on the</span>
+                  <span class="text-sm font-semibold text-slate-400">App Store</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Android 卡片：可下载 -->
+          <div class="app-card group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/50 hover:bg-slate-900/80 hover:shadow-xl hover:shadow-emerald-500/10 sm:p-8">
+            <div
+              class="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/0 to-cyan-500/0 transition-all duration-500 group-hover:from-emerald-500/10 group-hover:to-cyan-500/10"
+              aria-hidden="true"
+            />
+            <div class="relative flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
+              <!-- 左侧：标题 + 副标题 + 提示 + 按钮 -->
+              <div class="flex flex-1 flex-col items-center sm:items-start">
+                <div
+                  class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 text-emerald-400 ring-1 ring-emerald-400/20 sm:mx-0"
+                >
+                  <ZIcon name="ri:android-fill" :size="28" color="currentColor" />
+                </div>
+                <h3 class="mt-5 text-xl font-semibold text-slate-100 sm:text-2xl">
+                  {{ t("home.app.android.title") }}
+                </h3>
+                <!-- 可下载徽章（与 iOS 「开发中」徽章视觉对称） -->
+                <span class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400 ring-1 ring-emerald-400/20">
+                  <ZIcon name="ri:check-line" :size="12" color="currentColor" />
+                  {{ t("home.app.android.subtitle") }}
+                </span>
+                <p class="mt-4 text-sm leading-relaxed text-slate-400">
+                  <template v-if="isMobile">
+                    {{ t("home.app.android.click_hint") }}
+                  </template>
+                  <template v-else>
+                    {{ t("home.app.android.scan_hint") }}
+                  </template>
+                </p>
+                <!-- Android APK 徽章（移动端点击下载，桌面端为辅助 CTA；与 iOS App Store 徽章视觉对称） -->
+                <a
+                  :href="ANDROID_DOWNLOAD_URL"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:bg-slate-800/80 hover:shadow-lg hover:shadow-emerald-500/10 active:translate-y-0"
+                  :title="t('home.app.android.button')"
+                >
+                  <ZIcon name="ri:android-fill" :size="22" color="currentColor" class="text-emerald-400" />
+                  <span class="flex flex-col items-start leading-tight">
+                    <span class="text-[10px] uppercase tracking-wide text-slate-500">Download</span>
+                    <span class="text-sm font-semibold text-slate-200">APK</span>
+                  </span>
+                </a>
+              </div>
+
+              <!-- 右侧：二维码（仅桌面端展示） -->
+              <div v-if="!isMobile" class="mt-6 flex shrink-0 flex-col items-center sm:mt-0">
+                <div
+                  class="rounded-2xl border border-slate-700/60 bg-white p-2 shadow-lg shadow-emerald-500/10"
+                  :title="t('home.app.qr_alt')"
+                >
+                  <NQrCode
+                    :value="ANDROID_DOWNLOAD_URL"
+                    :size="140"
+                    color="#0f172a"
+                    background-color="#ffffff"
+                    :padding="8"
+                    type="svg"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ==================== 交流与反馈 ==================== -->
-    <section class="relative border-t border-slate-800/40 bg-slate-900/20 py-10 sm:py-16">
+    <section id="contact" class="relative scroll-mt-16 border-t border-slate-800/40 bg-slate-900/20 py-10 sm:py-16">
       <div class="mx-auto max-w-7xl px-4 sm:px-6">
         <!-- 标题 -->
         <div class="mb-10 text-center sm:mb-14">
