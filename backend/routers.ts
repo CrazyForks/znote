@@ -69,6 +69,26 @@ publicRouter.use(
     }),
 );
 
+publicRouter.use(
+    "/_resources/*",
+    serveStatic({
+        root: "./data/_resources",
+        onFound: (_path, c) => {
+            c.header("Cache-Control", "public, immutable, max-age=604800");
+        },
+    }),
+);
+
+publicRouter.use(
+    "/assets/*",
+    serveStatic({
+        root: "./data/assets",
+        onFound: (_path, c) => {
+            c.header("Cache-Control", "public, immutable, max-age=604800");
+        },
+    }),
+);
+
 publicRouter.get("/", index);
 publicRouter.get("/dashboard", index);
 publicRouter.get("/dashboard/*", index);
