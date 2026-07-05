@@ -112,7 +112,7 @@ export async function vectorizeNextBatch(batchSize = 20) {
             apiKey: embeddingConfig.api_key,
         });
 
-        const contents = toProcess.map(n => n.content);
+        const contents = toProcess.map(n => `${n.title}\n\n${n.content}`);
         const isBgeModel = embeddingConfig.model.toLowerCase().includes("bge");
         const { embeddings } = await embedMany({
             model: openai.embedding(embeddingConfig.model),
@@ -179,8 +179,7 @@ export async function updateVectorizedNotes(batchSize = 20) {
         return { success: 0, failed: 0 };
     }
 
-    // 2. 查询需要更新的笔记（6 分钟缓冲避免正在编辑的笔记）
-    const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
+    // 2. 查询需要更新的笔记（更新时间晚于向量化时间）
     const notes = await db
         .select()
         .from(schema.notes)
@@ -190,7 +189,6 @@ export async function updateVectorizedNotes(batchSize = 20) {
                 eq(schema.notes.allow_vectorize, 1),
                 eq(schema.notes.is_vectorized, 1),
                 sql`${schema.notes.updated_at} > ${schema.notes.vectorized_at}`,
-                lte(schema.notes.updated_at, sixMinutesAgo),
             )
         )
         .orderBy(desc(schema.notes.id))
@@ -244,7 +242,7 @@ export async function updateVectorizedNotes(batchSize = 20) {
             apiKey: embeddingConfig.api_key,
         });
 
-        const contents = notes.map(n => n.content);
+        const contents = notes.map(n => `${n.title}\n\n${n.content}`);
         const isBgeModel = embeddingConfig.model.toLowerCase().includes("bge");
         const { embeddings } = await embedMany({
             model: openai.embedding(embeddingConfig.model),
