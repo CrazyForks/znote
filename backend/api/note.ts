@@ -132,7 +132,7 @@ export const updateNote = async (c: Context) => {
     const uid = Number(c.get("uid"));
     const payload = await c.req.json();
 
-    const { id, title, content, notebook_id, is_pinned, sort_order, create_version } = payload || {};
+    const { id, title, content, notebook_id, is_pinned, sort_order, allow_vectorize, create_version } = payload || {};
     // 默认创建版本快照，自动保存时前端传 false
     const shouldCreateVersion = create_version !== false;
 
@@ -196,6 +196,7 @@ export const updateNote = async (c: Context) => {
     }
     if (is_pinned !== undefined) updates.is_pinned = is_pinned;
     if (sort_order !== undefined) updates.sort_order = sort_order;
+    if (allow_vectorize !== undefined) updates.allow_vectorize = allow_vectorize;
 
     // 仅当 title 或 content 实际变化时才生成历史版本
     // content 的 trim 仅用于判定是否记版本，实际存储保留原值（含空白）

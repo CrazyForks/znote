@@ -36,6 +36,9 @@ export interface Note {
     notebook_id: number;
     title: string;
     content: string;
+    allow_vectorize: number;
+    is_vectorized: number;
+    vectorized_at: number | string | null;
     is_pinned: number;
     is_deleted: number;
     deleted_at: number | string | null;

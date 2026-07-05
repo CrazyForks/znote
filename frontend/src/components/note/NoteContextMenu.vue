@@ -17,7 +17,7 @@ import ZIcon from "@/components/DynamicIcon.vue";
 import type { Note } from "@/types/note";
 
 /** 右键菜单可触发的操作 */
-export type NoteContextAction = "trash" | "pin" | "move" | "open_new_window" | "permanent_delete" | "share";
+export type NoteContextAction = "trash" | "pin" | "move" | "open_new_window" | "permanent_delete" | "share" | "disable_vectorize" | "enable_vectorize";
 
 const props = defineProps<{
     /** 菜单是否显示 */
@@ -48,6 +48,9 @@ const dropdownThemeOverrides = {
 /** 当前笔记是否已置顶（决定菜单项文案） */
 const isPinned = computed(() => props.note?.is_pinned === 1);
 
+/** 当前笔记是否允许向量化 */
+const isVectorized = computed(() => props.note?.allow_vectorize === 1);
+
 /** 菜单选项配置 */
 const menuOptions = computed(() => {
     const isDeleted = props.note?.is_deleted === 1;
@@ -73,6 +76,11 @@ const menuOptions = computed(() => {
             icon: () => h(ZIcon, { name: "ri:pushpin-2-line", size: 16 }),
         },
         {
+            label: isVectorized.value ? t("note.context.disable_vectorize") : t("note.context.enable_vectorize"),
+            key: isVectorized.value ? "disable_vectorize" : "enable_vectorize",
+            icon: () => h(ZIcon, { name: isVectorized.value ? "ri:brain-line" : "ri:brain-fill", size: 16 }),
+        },
+        {
             label: t("note.context.trash"),
             key: "trash",
             icon: () => h(ZIcon, { name: "ri:delete-bin-line", size: 16 }),
@@ -82,12 +90,12 @@ const menuOptions = computed(() => {
             key: "permanent_delete",
             icon: () => h(ZIcon, { name: "ri:delete-bin-6-fill", size: 16, color: "#e74c3c" }),
         },
-    ].filter((item) => !(isDeleted && (item.key === "trash" || item.key === "open_new_window" || item.key === "pin" || item.key === "share")) && !(!isDeleted && item.key === "permanent_delete"));
+    ].filter((item) => !(isDeleted && (item.key === "trash" || item.key === "open_new_window" || item.key === "pin" || item.key === "share" || item.key === "disable_vectorize" || item.key === "enable_vectorize")) && !(!isDeleted && item.key === "permanent_delete"));
 });
 
 /** NDropdown 选中某项时：转发给父组件处理，并关闭菜单 */
 const handleSelect = (key: string) => {
-    if (props.note && (key === "trash" || key === "pin" || key === "move" || key === "open_new_window" || key === "permanent_delete" || key === "share")) {
+    if (props.note && (key === "trash" || key === "pin" || key === "move" || key === "open_new_window" || key === "permanent_delete" || key === "share" || key === "disable_vectorize" || key === "enable_vectorize")) {
         emit("select", key as NoteContextAction, props.note);
     }
     emit("update:show", false);

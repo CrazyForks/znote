@@ -755,7 +755,7 @@ if (this.trashMode) this.exitTrashMode();
          */
         async updateNote(
             id: number,
-            payload: Partial<Pick<import("@/types/note").Note, "title" | "content" | "notebook_id" | "is_pinned" | "sort_order">>,
+            payload: Partial<Pick<import("@/types/note").Note, "title" | "content" | "notebook_id" | "is_pinned" | "sort_order" | "allow_vectorize">>,
             createVersion = true,
         ) {
             this.loading.save = true;

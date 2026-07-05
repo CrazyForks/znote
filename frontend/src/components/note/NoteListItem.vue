@@ -6,8 +6,12 @@
  * 选中态高亮，置顶笔记有特殊标记。
  */
 import { computed } from "vue";
+import { NTooltip } from "naive-ui";
+import { useI18n } from "vue-i18n";
 import ZIcon from "@/components/DynamicIcon.vue";
 import type { Note } from "@/types/note";
+
+const { t } = useI18n();
 
 const props = defineProps<{
     note: Note;
@@ -51,6 +55,31 @@ const formatTime = (t: number | string) => {
 
 /** 是否置顶 */
 const isPinned = computed(() => props.note.is_pinned === 1);
+
+/** 是否允许向量化 */
+const allowVectorize = computed(() => props.note.allow_vectorize === 1);
+
+/** 向量化状态配置 */
+const vectorizeStatus = computed(() => {
+    const status = props.note.is_vectorized;
+    switch (status) {
+        case 1: return { icon: "ri:checkbox-circle-fill", color: "#22c55e", label: t("note.vectorize.status.completed") };
+        case 2: return { icon: "ri:skip-right-line", color: "#f59e0b", label: t("note.vectorize.status.skipped") };
+        case 3: return { icon: "ri:close-circle-fill", color: "#ef4444", label: t("note.vectorize.status.failed") };
+        default: return { icon: "ri:loader-4-line", color: "#94a3b8", label: t("note.vectorize.status.pending") };
+    }
+});
+
+/** 向量化时间格式化 */
+const vectorizeTime = computed(() => {
+    const t = props.note.vectorized_at;
+    if (!t) return "";
+    const ts = typeof t === "number" && t < 1e12 ? t * 1000 : t;
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+});
 </script>
 
 <template>
@@ -102,12 +131,35 @@ const isPinned = computed(() => props.note.is_pinned === 1);
         {{ summary || "\u00A0" }}
       </p>
 
-      <!-- 时间 + 分类名 -->
+      <!-- 时间 + 分类名 + 向量化徽标 -->
       <div class="mt-1.5 flex items-center gap-2 text-[11px] text-slate-400">
         <span>{{ formatTime(note.updated_at) }}</span>
         <span v-if="categoryName" class="flex items-center gap-0.5">
           <ZIcon name="ri:folder-3-line" :size="11" color="#cbd5e1" />
           {{ categoryName }}
+        </span>
+        <span class="ml-auto flex items-center gap-1">
+          <NTooltip :delay="300">
+            <template #trigger>
+              <ZIcon
+                :name="allowVectorize ? 'ri:brain-line' : 'ri:brain-fill'"
+                :size="12"
+                :color="allowVectorize ? '#22c55e' : '#cbd5e1'"
+              />
+            </template>
+            {{ allowVectorize ? t("note.vectorize.allowed") : t("note.vectorize.disallowed") }}
+          </NTooltip>
+          <NTooltip :delay="300">
+            <template #trigger>
+              <ZIcon
+                :name="vectorizeStatus.icon"
+                :size="12"
+                :color="vectorizeStatus.color"
+              />
+            </template>
+            <span>{{ vectorizeStatus.label }}</span>
+            <span v-if="vectorizeTime"> · {{ vectorizeTime }}</span>
+          </NTooltip>
         </span>
       </div>
     </div>

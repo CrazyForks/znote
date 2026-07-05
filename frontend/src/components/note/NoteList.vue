@@ -221,6 +221,16 @@ const handleMenuSelect = async (action: NoteContextAction, note: Note) => {
         shareDialogShow.value = true;
         return;
     }
+    if (action === "disable_vectorize") {
+        await noteStore.updateNote(note.id, { allow_vectorize: 0 }, false);
+        message.success(t("note.context.disable_vectorize.success"));
+        return;
+    }
+    if (action === "enable_vectorize") {
+        await noteStore.updateNote(note.id, { allow_vectorize: 1 }, false);
+        message.success(t("note.context.enable_vectorize.success"));
+        return;
+    }
     // pin：智能切换置顶状态
     const next = note.is_pinned === 1 ? 0 : 1;
     await noteStore.updateNote(note.id, { is_pinned: next });
