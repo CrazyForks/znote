@@ -1,7 +1,7 @@
 import { getSettingValue } from "@/api/setting";
 
 /** 单篇内容最大字符数，超过则跳过（BAAI/bge-m3 上限约 8192 tokens，留余量） */
-export const MAX_CONTENT_LENGTH = 5000;
+export const MAX_CONTENT_LENGTH = 6000;
 
 /** 向量维度 */
 export const VECTOR_DIMENSIONS = 1024;
