@@ -22,6 +22,9 @@ const navRef = ref<HTMLElement | null>(null);
 /** 搜索关键词 */
 const searchKeyword = ref("");
 
+/** 注入父组件的 AI 点击处理函数 */
+const handleAiClick = inject<() => void>("handleAiClick", () => {});
+
 /** 根据搜索关键词过滤树（保留匹配的分类及其子节点） */
 const filteredTree = computed(() => {
     const kw = searchKeyword.value.trim().toLowerCase();
@@ -64,24 +67,35 @@ watch(expandedIds, async (ids) => {
 
 <template>
   <aside class="flex h-full flex-col border-r border-slate-200/60 bg-white/70 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
-    <!-- 搜索框 -->
+    <!-- 搜索框 + AI 按钮 -->
     <div class="sticky top-0 z-10 border-b border-slate-200/60 bg-transparent p-3 backdrop-blur-md">
-      <div class="relative">
-        <ZIcon name="ri:search-line" :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          v-model="searchKeyword"
-          type="text"
-          :placeholder="t('doc.search.placeholder')"
-          class="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-7 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-          @keydown.esc="searchKeyword = ''"
-        />
-        <!-- 清空按钮 -->
+      <div class="flex items-center gap-2">
+        <!-- 搜索输入框 -->
+        <div class="relative flex-1 min-w-0">
+          <ZIcon name="ri:search-line" :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            v-model="searchKeyword"
+            type="text"
+            :placeholder="t('doc.search.placeholder')"
+            class="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-7 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+            @keydown.esc="searchKeyword = ''"
+          />
+          <!-- 清空按钮 -->
+          <button
+            v-if="searchKeyword"
+            class="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            @click="searchKeyword = ''"
+          >
+            <ZIcon name="ri:close-line" :size="10" />
+          </button>
+        </div>
+        <!-- AI 按钮 -->
         <button
-          v-if="searchKeyword"
-          class="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          @click="searchKeyword = ''"
+          class="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-500"
+          :title="t('note.ai.button')"
+          @click="handleAiClick"
         >
-          <ZIcon name="ri:close-line" :size="10" />
+          <ZIcon name="ri:robot-2-line" :size="14" />
         </button>
       </div>
     </div>

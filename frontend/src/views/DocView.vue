@@ -201,6 +201,7 @@ provide("expandedIds", expandedIds);
 provide("slug", slug.value);
 provide("headings", headings);
 provide("contentRef", contentRef);
+provide("handleAiClick", handleAiClick);
 
 /** 检测屏幕宽度 */
 const checkMobile = () => {
