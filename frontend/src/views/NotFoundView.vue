@@ -14,7 +14,7 @@ const router = useRouter();
   >
     <div class="px-4 text-center">
       <!-- 404 数字 -->
-      <h1 class="text-8xl font-bold tracking-tighter text-blue-200 sm:text-9xl">
+      <h1 class="text-8xl font-bold tracking-tighter text-blue-400 sm:text-9xl">
         {{ t("notfound.title") }}
       </h1>
 

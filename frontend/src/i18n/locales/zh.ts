@@ -439,6 +439,7 @@ export default {
     "note.shares.empty": "暂无分享",
     "note.shares.status.active": "有效",
     "note.shares.status.revoked": "已撤销",
+    "note.shares.status.expired": "失效",
     "note.shares.no_password": "无密码",
     "note.shares.never_expire": "永不过期",
     "note.shares.copy_link": "复制链接",

@@ -439,6 +439,7 @@ export default {
     "note.shares.empty": "No shares yet",
     "note.shares.status.active": "Active",
     "note.shares.status.revoked": "Revoked",
+    "note.shares.status.expired": "Expired",
     "note.shares.no_password": "No password",
     "note.shares.never_expire": "Never expires",
     "note.shares.copy_link": "Copy Link",

@@ -78,6 +78,12 @@ const handleDelete = async (id: number) => {
     }
 };
 
+/** 判断分享是否已过期 */
+const isExpired = (share: ShareItem): boolean => {
+    if (!share.expires_at) return false;
+    return new Date(share.expires_at).getTime() < Date.now();
+};
+
 /** 新窗口打开分享页面 */
 const handleOpenShare = (shareId: string) => {
     window.open(`/s/${shareId}`, "_blank");
@@ -129,11 +135,17 @@ const handleOpenShare = (shareId: string) => {
             <!-- 状态标签 -->
             <span
               class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
-              :class="share.status === 'active'
+              :class="isExpired(share)
+                ? 'bg-red-50 text-red-500'
+                : share.status === 'active'
                 ? 'bg-emerald-50 text-emerald-600'
                 : 'bg-slate-100 text-slate-400'"
             >
-              {{ share.status === 'active' ? t('note.shares.status.active') : t('note.shares.status.revoked') }}
+              {{ isExpired(share)
+                ? t('note.shares.status.expired')
+                : share.status === 'active'
+                ? t('note.shares.status.active')
+                : t('note.shares.status.revoked') }}
             </span>
 
             <!-- 到期时间 -->
