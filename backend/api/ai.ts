@@ -7,7 +7,7 @@ import { embedMany } from "ai";
 import { RequestContext } from "@mastra/core/request-context";
 import { vectorStore, INDEX_NAME } from "@/db/vector";
 import { checkNotebookOwnership } from "@/utils/ownership";
-import { getBaseURL, getAIChatConfig, getAIEmbeddingConfig, MAX_CONTENT_LENGTH, VECTOR_DIMENSIONS } from "@/utils/ai-config";
+import { getBaseURL, getAIChatConfig, getAIEmbeddingConfig, MAX_CONTENT_LENGTH, VECTOR_DIMENSIONS, getMaxContentLength } from "@/utils/ai-config";
 
 // ==================== 向量化 ====================
 
@@ -42,11 +42,12 @@ export async function vectorizeNextBatch(batchSize = 20) {
         return { success: 0, skipped: 0, failed: 0 };
     }
 
-    // 3. 分离超长内容（>MAX_CONTENT_LENGTH 字符）→ 标记为 is_vectorized=2（跳过）
+    // 3. 分离超长内容（根据模型动态调整长度限制）→ 标记为 is_vectorized=2（跳过）
+    const maxContentLength = getMaxContentLength(embeddingConfig.model);
     const tooLong: number[] = [];
     const toProcess: typeof notes = [];
     for (const note of notes) {
-        if (note.content.length > MAX_CONTENT_LENGTH) {
+        if (note.content.length > maxContentLength) {
             tooLong.push(note.id);
         } else {
             toProcess.push(note);

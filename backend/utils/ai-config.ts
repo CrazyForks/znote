@@ -3,6 +3,11 @@ import { getSettingValue } from "@/api/setting";
 /** 单篇内容最大字符数，超过则跳过（BAAI/bge-m3 上限约 8192 tokens，留余量） */
 export const MAX_CONTENT_LENGTH = 6000;
 
+/** 根据模型名称返回最大内容长度（qwen 模型支持更长内容） */
+export function getMaxContentLength(model: string): number {
+    return model.toLowerCase().includes("qwen") ? 15000 : MAX_CONTENT_LENGTH;
+}
+
 /** 向量维度 */
 export const VECTOR_DIMENSIONS = 1024;
 
