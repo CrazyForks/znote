@@ -82,6 +82,19 @@ const extractHeadings = () => {
             });
         });
         headings.value = items;
+
+        // 如果 URL 带有 hash 锚点，滚动到对应标题
+        if (route.hash) {
+            const targetId = route.hash.replace("#", "");
+            if (items.some((h) => h.id === targetId)) {
+                requestAnimationFrame(() => {
+                    const el = document.getElementById(targetId);
+                    if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                });
+            }
+        }
     }, 300);
 };
 
@@ -119,6 +132,19 @@ watch(
     (newId) => {
         const noteId = Number(newId);
         if (noteId) fetchNote(noteId);
+    },
+);
+
+/** 监听 hash 变化：浏览器前进/后退时滚动到对应标题 */
+watch(
+    () => route.hash,
+    (hash) => {
+        if (!hash) return;
+        const targetId = hash.replace("#", "");
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
     },
 );
 

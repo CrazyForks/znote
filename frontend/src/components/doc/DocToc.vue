@@ -6,9 +6,11 @@
  */
 import { computed, inject, ref, onMounted, onUnmounted, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import ZIcon from "@/components/DynamicIcon.vue";
 
 const { t } = useI18n();
+const router = useRouter();
 
 const props = defineProps<{
     /** 移动端时是否作为浮动弹窗 */
@@ -34,13 +36,14 @@ const contentRef = inject<Ref<HTMLElement | null>>("contentRef", ref(null));
 /** 有标题才显示 */
 const hasHeadings = computed(() => headings.value.length > 0);
 
-/** 平滑滚动到指定标题 */
+/** 平滑滚动到指定标题，并更新浏览器地址栏 hash */
 const scrollToHeading = (id: string) => {
     activeId.value = id;
     const el = document.getElementById(id);
     if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+    router.replace({ hash: `#${id}` });
     // 移动端关闭弹窗
     if (props.floating) {
         showMobileToc.value = false;
