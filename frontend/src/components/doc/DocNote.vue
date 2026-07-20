@@ -13,6 +13,7 @@ import type { DesignTokens } from "@incremark/theme";
 import "@incremark/theme/styles.css";
 import req from "@/utils/req";
 import ZIcon from "@/components/DynamicIcon.vue";
+import pinyin from "tiny-pinyin";
 
 /** 代码块主题：深色背景 + 亮色文字 */
 const codeTheme = {
@@ -65,6 +66,15 @@ const formatDate = (val: any): string => {
     });
 };
 
+/** 将标题文本转为 URL 友好的拼音/英文 slug */
+const toSlug = (text: string): string => {
+    return pinyin
+        .convertToPinyin(text, "-", true)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+};
+
 /** 提取渲染后的标题 DOM 并分配 ID（Incremark 异步渲染，需延迟） */
 const extractHeadings = () => {
     // IncremarkContent 内部异步解析 markdown，需要等待渲染完成
@@ -72,12 +82,25 @@ const extractHeadings = () => {
         if (!contentRef.value) return;
         const headingEls = contentRef.value.querySelectorAll("h2, h3, h4");
         const items: { level: number; text: string; id: string }[] = [];
+        const usedIds = new Map<string, number>();
         headingEls.forEach((el, i) => {
-            const id = `heading-${i}`;
+            const rawText = el.textContent || "";
+            if (!rawText) {
+                // 空标题降级为数字 ID
+                const id = `heading-${i}`;
+                el.id = id;
+                items.push({ level: parseInt(el.tagName[1]), text: "", id });
+                return;
+            }
+            let slug = toSlug(rawText);
+            if (!slug) slug = `heading-${i}`; // toSlug 可能返回空字符串（如纯符号标题）
+            const count = (usedIds.get(slug) || 0) + 1;
+            usedIds.set(slug, count);
+            const id = count === 1 ? slug : `${slug}-${count}`;
             el.id = id;
             items.push({
                 level: parseInt(el.tagName[1]),
-                text: el.textContent || "",
+                text: rawText,
                 id,
             });
         });
